@@ -6,8 +6,8 @@ import org.hibernate.Session
 import org.hibernate.annotations.Filter
 import org.hibernate.annotations.FilterDef
 import java.util.stream.Stream
-import javax.persistence.LockModeType
-import javax.persistence.NonUniqueResultException
+import jakarta.persistence.LockModeType
+import jakarta.persistence.NonUniqueResultException
 
 /**
  * Interface representing an entity query, which abstracts the use of paging, getting the number of results, and

@@ -5,7 +5,7 @@ import org.jboss.resteasy.reactive.server.model.ServerResourceMethod
 import org.jboss.resteasy.reactive.server.spi.EndpointInvoker
 import org.jboss.resteasy.reactive.server.spi.ServerRestHandler
 import java.util.function.Supplier
-import javax.enterprise.inject.spi.CDI
+import jakarta.enterprise.inject.spi.CDI
 
 /**
  * Intercepts method invocations to force an EndpointInvoker.

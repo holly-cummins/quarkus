@@ -5,8 +5,8 @@ import io.quarkus.hibernate.orm.panache.kotlin.PanacheQuery
 import io.quarkus.panache.common.Page
 import io.quarkus.panache.common.Parameters
 import java.util.stream.Stream
-import javax.persistence.EntityManager
-import javax.persistence.LockModeType
+import jakarta.persistence.EntityManager
+import jakarta.persistence.LockModeType
 
 class PanacheQueryImpl<Entity: Any> : PanacheQuery<Entity> {
     private var delegate: CommonPanacheQueryImpl<Entity>

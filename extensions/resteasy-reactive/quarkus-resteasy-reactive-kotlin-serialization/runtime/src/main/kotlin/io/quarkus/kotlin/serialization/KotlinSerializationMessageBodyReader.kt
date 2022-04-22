@@ -11,9 +11,9 @@ import org.jboss.resteasy.reactive.server.spi.ServerMessageBodyReader
 import org.jboss.resteasy.reactive.server.spi.ServerRequestContext
 import java.io.InputStream
 import java.lang.reflect.Type
-import javax.inject.Inject
-import javax.ws.rs.core.MediaType
-import javax.ws.rs.core.MultivaluedMap
+import jakarta.inject.Inject
+import jakarta.ws.rs.core.MediaType
+import jakarta.ws.rs.core.MultivaluedMap
 
 class KotlinSerializationMessageBodyReader(private val json: Json) : AbstractJsonMessageBodyReader(), ServerMessageBodyReader<Any> {
     override fun isReadable(type: Class<*>, genericType: Type, annotations: Array<Annotation>?, mediaType: MediaType) =

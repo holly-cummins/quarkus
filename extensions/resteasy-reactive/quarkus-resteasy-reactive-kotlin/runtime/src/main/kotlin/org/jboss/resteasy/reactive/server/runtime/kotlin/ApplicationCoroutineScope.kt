@@ -5,8 +5,8 @@ import kotlinx.coroutines.*
 import org.jboss.resteasy.reactive.server.core.CurrentRequestManager
 import org.jboss.resteasy.reactive.server.core.ResteasyReactiveRequestContext
 import org.jboss.resteasy.reactive.spi.ThreadSetupAction
-import javax.annotation.PreDestroy
-import javax.inject.Singleton
+import jakarta.annotation.PreDestroy
+import jakarta.inject.Singleton
 import kotlin.coroutines.CoroutineContext
 
 /**

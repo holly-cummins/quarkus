@@ -11,10 +11,10 @@ import org.jboss.resteasy.reactive.server.spi.ServerRequestContext
 import java.io.OutputStream
 import java.lang.reflect.Type
 import java.nio.charset.StandardCharsets
-import javax.inject.Inject
-import javax.ws.rs.Produces
-import javax.ws.rs.core.MediaType
-import javax.ws.rs.core.MultivaluedMap
+import jakarta.inject.Inject
+import jakarta.ws.rs.Produces
+import jakarta.ws.rs.core.MediaType
+import jakarta.ws.rs.core.MultivaluedMap
 
 @Produces("application/json", "application/*+json", "text/json")
 @OptIn(ExperimentalSerializationApi::class)

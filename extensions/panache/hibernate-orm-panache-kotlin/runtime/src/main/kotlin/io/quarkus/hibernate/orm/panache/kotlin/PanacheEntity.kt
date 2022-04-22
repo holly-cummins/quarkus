@@ -1,9 +1,9 @@
 package io.quarkus.hibernate.orm.panache.kotlin
 
 
-import javax.persistence.GeneratedValue
-import javax.persistence.Id
-import javax.persistence.MappedSuperclass
+import jakarta.persistence.GeneratedValue
+import jakarta.persistence.Id
+import jakarta.persistence.MappedSuperclass
 
 /**
  * Represents an entity with a generated ID field [id] of type [Long]. If your

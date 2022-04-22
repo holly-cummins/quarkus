@@ -7,10 +7,10 @@ import kotlinx.serialization.serializer
 import org.jboss.resteasy.reactive.common.util.StreamUtil
 import java.io.InputStream
 import java.lang.reflect.Type
-import javax.inject.Inject
-import javax.ws.rs.core.MediaType
-import javax.ws.rs.core.MultivaluedMap
-import javax.ws.rs.ext.MessageBodyReader
+import jakarta.inject.Inject
+import jakarta.ws.rs.core.MediaType
+import jakarta.ws.rs.core.MultivaluedMap
+import jakarta.ws.rs.ext.MessageBodyReader
 
 @OptIn(ExperimentalSerializationApi::class)
 class ClientKotlinMessageBodyReader(private val json: Json) : MessageBodyReader<Any> {
