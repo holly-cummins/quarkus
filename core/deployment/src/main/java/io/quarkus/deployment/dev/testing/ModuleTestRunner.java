@@ -92,11 +92,15 @@ public class ModuleTestRunner {
                             runner = null;
                         }
                         Thread.currentThread().setContextClassLoader(old);
+                        System.out.println("97 HOLLY module test runner setting TCCL to old classloader "
+                                + old);
                     }
                 }
             };
         } finally {
             Thread.currentThread().setContextClassLoader(old);
+            System.out.println("104 HOLLY module test runner setting TCCL to old classloader "
+                    + old);
         }
     }
 

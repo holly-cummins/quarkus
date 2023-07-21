@@ -27,6 +27,7 @@ import io.quarkus.bootstrap.app.CuratedApplication;
 import io.quarkus.bootstrap.app.QuarkusBootstrap;
 import io.quarkus.bootstrap.app.RunningQuarkusApplication;
 import io.quarkus.bootstrap.app.StartupAction;
+import io.quarkus.bootstrap.app.StartupActionHolder;
 import io.quarkus.bootstrap.classloading.QuarkusClassLoader;
 import io.quarkus.builder.BuildResult;
 import io.quarkus.deployment.builditem.ApplicationClassNameBuildItem;
@@ -80,6 +81,9 @@ public class StartupActionImpl implements StartupAction {
                     transformedClasses);
             runtimeClassLoader = curatedApplication.createRuntimeClassLoader(
                     resources, transformedClasses);
+            System.out.println("HOLLY STARTUP ACTION MADE RUNtime " + runtimeClassLoader);
+            System.out.println("startup thread is " + Thread.currentThread());
+            // new Exception().printStackTrace();
         }
         this.runtimeClassLoader = runtimeClassLoader;
     }
@@ -441,6 +445,11 @@ public class StartupActionImpl implements StartupAction {
             }
         }
         return data;
+    }
+
+    @Override
+    public void store() {
+        StartupActionHolder.store(this);
     }
 
 }
