@@ -250,6 +250,7 @@ public class AugmentActionImpl implements AugmentAction {
             throw new IllegalStateException("Cannot launch a runtime application with NORMAL launch mode");
         }
         try (QuarkusClassLoader classLoader = curatedApplication.createDeploymentClassLoader()) {
+            System.out.println("251 HOLLY creating deployment classloader " + classLoader);
             @SuppressWarnings("unchecked")
             BuildResult result = runAugment(true, Collections.emptySet(), null, classLoader, NON_NORMAL_MODE_OUTPUTS);
             return new StartupActionImpl(curatedApplication, result);
@@ -262,6 +263,7 @@ public class AugmentActionImpl implements AugmentAction {
         if (launchMode != LaunchMode.DEVELOPMENT) {
             throw new IllegalStateException("Only application with launch mode DEVELOPMENT can restart");
         }
+        System.out.println("265 HOLLY on reload " + classLoader);
 
         try (QuarkusClassLoader classLoader = curatedApplication.createDeploymentClassLoader()) {
             @SuppressWarnings("unchecked")
