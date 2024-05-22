@@ -994,46 +994,15 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
             for (int i = 0; i < originalArguments.size(); i++) {
                 if (testMethodInvokerToUse != null) {
                     Class<?> argClass = parameters[i].getType();
-                if (arg != null) {
-                    Class<?> theclass = argClass;
-                    while (theclass.isArray()) {
-                        theclass = theclass.getComponentType();
-                    }
-                    if (theclass.isPrimitive()) {
-                        cloneRequired = false;
-                    } else if (TestInfo.class.isAssignableFrom(theclass)) {
-                        TestInfo info = (TestInfo) arg;
-                        Method newTestMethod = info.getTestMethod().isPresent()
-                                ? determineTCCLExtensionMethod(info.getTestMethod().get(), testClassFromTCCL)
-                                : null;
-                        replacement = new TestInfoImpl(info.getDisplayName(), info.getTags(),
-                                Optional.of(testClassFromTCCL),
-                                Optional.ofNullable(newTestMethod));
-                    } else if (clonePattern.matcher(theclass.getName()).matches()) {
-                        cloneRequired = true;
-                    } else {
-                        try {
-                            cloneRequired = runningQuarkusApplication.getClassLoader()
-                                    .loadClass(theclass.getName()) != theclass;
-                            System.out.println("clone required" + cloneRequired);
-                        } catch (ClassNotFoundException e) {
-                            if (arg instanceof Supplier) {
-                                cloneRequired = true;
-                            } else {
-                                throw e;
-                            }
-                        }
-                    }
-                }
-
-                    argumentsFromTccl.add(testMethodInvokerToUse.getClass().getMethod("methodParamInstance", String.class)
+                if (testMethodInvokerToUse != null) {
+                    argumentsFromTccl.add(testMethodInvokerToUse.getClass()
+                            .getMethod("methodParamInstance", String.class)
                             .invoke(testMethodInvokerToUse, argClass.getName()));
                 } else {
                     Object arg = originalArguments.get(i);
                     argumentsFromTccl.add(deepClone.clone(arg));
                 }
             }
-
             if (testMethodInvokerToUse != null) {
                 return testMethodInvokerToUse.getClass()
                         .getMethod("invoke", Object.class, Method.class, List.class, String.class)
