@@ -263,7 +263,7 @@ public class AugmentActionImpl implements AugmentAction {
         if (launchMode != LaunchMode.DEVELOPMENT) {
             throw new IllegalStateException("Only application with launch mode DEVELOPMENT can restart");
         }
-        System.out.println("265 HOLLY on reload " + classLoader);
+        System.out.println("265 HOLLY on reload ");
 
         try (QuarkusClassLoader classLoader = curatedApplication.createDeploymentClassLoader()) {
             @SuppressWarnings("unchecked")

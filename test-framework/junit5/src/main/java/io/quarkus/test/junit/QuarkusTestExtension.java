@@ -986,7 +986,6 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
 
             // the arguments were not loaded from TCCL so we need to deep clone them into the TCCL
             // because the test method runs from a class loaded from the TCCL
-            // TODO all of this code can be deleted, right? we don't even honour the clone required setting
             //TODO: make this more pluggable
             List<Object> originalArguments = invocationContext.getArguments();
             List<Object> argumentsFromTccl = new ArrayList<>();
@@ -994,22 +993,24 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
             for (int i = 0; i < originalArguments.size(); i++) {
                 if (testMethodInvokerToUse != null) {
                     Class<?> argClass = parameters[i].getType();
-                if (testMethodInvokerToUse != null) {
-                    argumentsFromTccl.add(testMethodInvokerToUse.getClass()
-                            .getMethod("methodParamInstance", String.class)
-                            .invoke(testMethodInvokerToUse, argClass.getName()));
-                } else {
-                    Object arg = originalArguments.get(i);
-                    argumentsFromTccl.add(deepClone.clone(arg));
+                    if (testMethodInvokerToUse != null) {
+                        argumentsFromTccl.add(testMethodInvokerToUse.getClass()
+                                .getMethod("methodParamInstance", String.class)
+                                .invoke(testMethodInvokerToUse, argClass.getName()));
+                    } else {
+                        Object arg = originalArguments.get(i);
+                        argumentsFromTccl.add(deepClone.clone(arg));
+                    }
                 }
-            }
-            if (testMethodInvokerToUse != null) {
-                return testMethodInvokerToUse.getClass()
-                        .getMethod("invoke", Object.class, Method.class, List.class, String.class)
-                        .invoke(testMethodInvokerToUse, effectiveTestInstance, newMethod, argumentsFromTccl,
-                                extensionContext.getRequiredTestClass().getName());
-            } else {
-                return newMethod.invoke(effectiveTestInstance, argumentsFromTccl.toArray(new Object[0]));
+                if (testMethodInvokerToUse != null) {
+                    return testMethodInvokerToUse.getClass()
+                            .getMethod("invoke", Object.class, Method.class, List.class, String.class)
+                            .invoke(testMethodInvokerToUse, effectiveTestInstance, newMethod, argumentsFromTccl,
+                                    extensionContext.getRequiredTestClass()
+                                            .getName());
+                } else {
+                    return newMethod.invoke(effectiveTestInstance, argumentsFromTccl.toArray(new Object[0]));
+                }
             }
 
         } catch (InvocationTargetException e) {
@@ -1022,6 +1023,8 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
             System.out.println("HOLLY got to the end of  runExtensionMethod");
             setCCL(old);
         }
+        //TODO put in to make it compile
+        return null;
     }
 
     private Method determineTCCLExtensionMethod(Method originalMethod, Class<?> c)

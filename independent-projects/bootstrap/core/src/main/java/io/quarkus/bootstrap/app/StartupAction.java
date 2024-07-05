@@ -1,7 +1,7 @@
 package io.quarkus.bootstrap.app;
 
-import java.nio.file.Path;
 import java.io.Closeable;
+import java.nio.file.Path;
 import java.util.Map;
 import java.util.function.Consumer;
 
