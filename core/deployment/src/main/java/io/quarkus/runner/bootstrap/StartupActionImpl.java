@@ -78,10 +78,14 @@ public class StartupActionImpl implements StartupAction {
         } else {
             baseClassLoader.reset(extractGeneratedResources(buildResult, false),
                     transformedClasses);
-            runtimeClassLoader = curatedApplication.createRuntimeClassLoader(
+            // TODO Need to do recreations in JUnitTestRunner for dev mode case
+            // TODO This is wrong, since it should be re-created for every startup
+            // TODO need to clear it on shutdown
+            runtimeClassLoader = curatedApplication.getOrCreateRuntimeClassLoader(
                     resources, transformedClasses);
         }
         this.runtimeClassLoader = runtimeClassLoader;
+        runtimeClassLoader.setStartupAction(this);
     }
 
     /**
@@ -183,6 +187,7 @@ public class StartupActionImpl implements StartupAction {
     }
 
     private void doClose() {
+        curatedApplication.tidy();
         try {
             runtimeClassLoader.loadClass(Quarkus.class.getName()).getMethod("blockingExit").invoke(null);
         } catch (InvocationTargetException | NoSuchMethodException | IllegalAccessException
@@ -281,6 +286,7 @@ public class StartupActionImpl implements StartupAction {
 
         //we have our class loaders
         ClassLoader old = Thread.currentThread().getContextClassLoader();
+        System.out.println("HOLLY running about to trigger SC " + runtimeClassLoader);
         try {
             Thread.currentThread().setContextClassLoader(runtimeClassLoader);
             final String className = applicationClassName;

@@ -14,8 +14,13 @@ public interface TestHttpEndpointProvider {
 
     static List<Function<Class<?>, String>> load() {
         List<Function<Class<?>, String>> ret = new ArrayList<>();
+        System.out.println("HOLLY wull load " + TestHttpEndpointProvider.class.getClassLoader() + " and tccl "
+                + Thread.currentThread().getContextClassLoader());
+
+        ClassLoader targetclassloader = TestHttpEndpointProvider.class
+                .getClassLoader(); // Thread.currentThread().getContextClassLoader();
         for (TestHttpEndpointProvider i : ServiceLoader.load(TestHttpEndpointProvider.class,
-                Thread.currentThread().getContextClassLoader())) {
+                targetclassloader)) {
             ret.add(i.endpointProvider());
         }
         return ret;
