@@ -135,6 +135,8 @@ public class JunitTestRunner {
         try {
             long start = System.currentTimeMillis();
             ClassLoader old = Thread.currentThread().getContextClassLoader();
+            System.out.println("HOLLU junit prepare, old is " + old);
+
             QuarkusClassLoader tcl = testApplication.createDeploymentClassLoader();
             LogCapturingOutputFilter logHandler = new LogCapturingOutputFilter(testApplication, true, true,
                     TestSupport.instance().get()::isDisplayTestOutput);
@@ -584,6 +586,7 @@ public class JunitTestRunner {
         Set<String> quarkusTestClasses = new HashSet<>();
         for (var a : Arrays.asList(QUARKUS_TEST, QUARKUS_MAIN_TEST)) {
             for (AnnotationInstance i : index.getAnnotations(a)) {
+
                 DotName name = i.target().asClass().name();
                 quarkusTestClasses.add(name.toString());
                 for (ClassInfo clazz : index.getAllKnownSubclasses(name)) {
@@ -597,6 +600,8 @@ public class JunitTestRunner {
         Set<DotName> allTestAnnotations = collectTestAnnotations(index);
         Set<DotName> allTestClasses = new HashSet<>();
         Map<DotName, DotName> enclosingClasses = new HashMap<>();
+        Map<String, String> profiles = new HashMap<>();
+        Map<String, ClassLoader> rcls = new HashMap<>();
         for (DotName annotation : allTestAnnotations) {
             for (AnnotationInstance instance : index.getAnnotations(annotation)) {
                 if (instance.target().kind() == AnnotationTarget.Kind.METHOD) {
@@ -646,6 +651,17 @@ public class JunitTestRunner {
             if (Modifier.isAbstract(clazz.flags())) {
                 continue;
             }
+            AnnotationInstance testProfile = clazz.declaredAnnotation(TEST_PROFILE);
+            // TODO is there a cleaner way to do this? probably!
+            if (testProfile == null) {
+                profiles.put(name, "no-profile");
+            } else {
+                System.out.println(
+                        "HOLLY profile is " + testProfile + testProfile.value().asString() + testProfile.value().asClass()
+                                + testProfile.value().name());
+                profiles.put(name,
+                        testProfile.value().asString());
+            }
             unitTestClasses.add(name);
         }
 
@@ -658,28 +674,45 @@ public class JunitTestRunner {
 
         System.out.println(
                 "HOLLY after the re-add or whatever? quarkus test classes is " + Arrays.toString(quarkusTestClasses.toArray()));
-        ClassLoader rcl = null;
         System.out.println("classload thread is " + Thread.currentThread());
 
         for (String i : quarkusTestClasses) {
             ClassLoader old = Thread.currentThread().getContextClassLoader();
+            String profileName = profiles.get(i);
+            if (profileName == null) {
+                profileName = "no-profile";
+            }
+            System.out.println("HOLLY profile name is " + profileName);
+            ClassLoader rcl = rcls.get(profileName);
+            System.out.println("HOLLY rcl is " + rcl);
+            //  rcl = null; // TODO diagnostics
             try {
                 if (rcl == null) {
                     System.out.println("HOLLY Making a java start with " + testApplication);
                     // Although it looks like we need to start once per class, the class is just indicative of where classes for this module live
 
+                    Class profile = null;
+                    // TODO diagnostics
+                    if (!"no-profile".equals(profileName)) {
+                        //TODO is this the right classloader to use?
+                        profile = Class.forName(profileName);
+                        System.out.println("HOLLY setting profile to " + profile);
+                    }
                     // CuratedApplications cannot (right now) be re-used between restarts. So even though the builder gave us a
                     // curated application, don't use it.
                     // TODO can we make the app re-usable, or otherwise leverage the app that we got passed in?
-                    // TODO sort out profiles!
+                    System.out.println("HOLLY will make an app using profile " + profile);
                     rcl = new AppMakerHelper()
                             .getStartupAction(Thread.currentThread().getContextClassLoader().loadClass(i), null,
-                                    true, null);
+                                    true, profile);
+                    rcls.put(profileName, rcl);
                 }
+                // TODO do we need to set a TCCL? Behaviour seems the same either way
                 Thread.currentThread().setContextClassLoader(rcl);
 
                 System.out.println("639 HOLLY loading quarkus test with " + Thread.currentThread().getContextClassLoader());
-                itClasses.add(Thread.currentThread().getContextClassLoader().loadClass(i));
+
+                itClasses.add(rcl.loadClass(i));
             } catch (Exception e) {
                 System.out.println("HOLLY BAD BAD" + e);
                 log.warnf(

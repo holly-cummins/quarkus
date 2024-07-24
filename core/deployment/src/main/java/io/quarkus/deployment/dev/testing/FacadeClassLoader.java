@@ -230,7 +230,7 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
         //                .unwrap(SmallRyeConfig.class)
         //                .getProfiles());
 
-        System.out.println("HOLLY interceipt original" + originalClassLoader);
+        System.out.println("HOLLY facade original" + originalClassLoader);
         AppMakerHelper appMakerHelper = new AppMakerHelper();
 
         CuratedApplication curatedApplication = curatedApplications.get(key);
@@ -333,6 +333,7 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
 
     @Override
     public void close() throws IOException {
+        // TODO clearly, an implementation is needed!
 
     }
 }

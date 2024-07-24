@@ -215,7 +215,7 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
 
             testHttpEndpointProviders = TestHttpEndpointProvider.load();
             System.out.println("HOLLY during execution, TCCL is " + Thread.currentThread().getContextClassLoader());
-            System.out.println("HOLLY the test was loaded with " + requiredTestClass);
+            System.out.println("HOLLY the test was loaded with " + requiredTestClass + requiredTestClass.getClassLoader());
 
             //            StartupAction startupAction = augmentAction.createInitialRuntimeApplication();
             // clear the test.url system property as the value leaks into the run when using different profiles
@@ -281,8 +281,10 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
 
             TracingHandler.quarkusStarted();
 
+            // TODO infinite loops? also causes all paramstests to fail + 37 failures??
+            // ... and doesn't even fix the config problem
+            //        ConfigProviderResolver.setInstance(new RunningAppConfigResolver(runningQuarkusApplication));
             //now we have full config reset the hang timer
-
             if (hangTaskKey != null) {
                 hangTaskKey.cancel(false);
                 hangTimeout = runningQuarkusApplication.getConfigValue(QUARKUS_TEST_HANG_DETECTION_TIMEOUT, Duration.class)
