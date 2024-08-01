@@ -232,6 +232,13 @@ public class AbstractJvmQuarkusTestExtension extends AbstractQuarkusTestWithCont
         // We could also look at the running application attached to the junit test and see if it's started
 
         // TODO
+        System.out.println(
+                "HOLLY checking is new " + runningQuarkusApplication);
+        if (runningQuarkusApplication != null) {
+            System.out.println(
+                    "HOLLY checking is new " + runningQuarkusApplication.getClassLoader()
+                            + currentJUnitTestClass.getClassLoader());
+        }
         return (runningQuarkusApplication == null
                 || runningQuarkusApplication.getClassLoader() != currentJUnitTestClass.getClassLoader());
 

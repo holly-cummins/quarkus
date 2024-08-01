@@ -14,6 +14,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import org.jboss.logging.Logger;
 
@@ -25,7 +26,7 @@ import io.quarkus.runtime.LaunchMode;
  * JUnit has many interceptors and listeners, but it does not allow us to intercept test discovery in a fine-grained way that
  * would allow us to swap the thread context classloader.
  * Since we can't intercept with a JUnit hook, we hijack from inside the classloader.
- *
+ * <p>
  * We need to load all our test classes in one go, during the discovery phase, before we start the applications.
  * We may need several applications and therefore, several classloaders, depending on what profiles are set.
  * To solve that, we prepare the applications, to get classloaders, and file them here.
@@ -66,6 +67,12 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
     private final ClassLoader canaryLoader;
     // TODO better mechanism; every QuarkusMainTest  gets its own application
     private int mainC = 0;
+    private Map<String, String> profiles;
+    private String classesPath;
+    private ClassLoader otherLoader;
+    private QuarkusClassLoader deploymentClassloader;
+    private Set<String> quarkusTestClasses;
+    private Set<String> quarkusMainTestClasses;
 
     public FacadeClassLoader(ClassLoader parent) {
         // TODO in dev mode, sometimes this is the deployment classloader, which doesn't seem right?
@@ -73,22 +80,24 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
         this.parent = parent;
         String classPath = System.getProperty("java.class.path");
         // This manipulation is needed to work in IDEs
-        URL[] urls = Arrays.stream(classPath.split(":")).map(s -> {
-            try {
-                //TODO what if it's not a file?
-                String spec = "file://" + s;
+        URL[] urls = Arrays.stream(classPath.split(":"))
+                .map(s -> {
+                    try {
+                        //TODO what if it's not a file?
+                        String spec = "file://" + s;
 
-                if (!spec.endsWith("jar") && !spec.endsWith("/")) {
-                    spec = spec + "/";
-                }
-                //    System.out.println("HOLLY added " + new URL(spec) + new URL(spec).openStream().available());
-                return new URL(spec);
-            } catch (MalformedURLException e) {
-                throw new RuntimeException(e);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        }).toArray(URL[]::new);
+                        if (!spec.endsWith("jar") && !spec.endsWith("/")) {
+                            spec = spec + "/";
+                        }
+                        //    System.out.println("HOLLY added " + new URL(spec) + new URL(spec).openStream().available());
+                        return new URL(spec);
+                    } catch (MalformedURLException e) {
+                        throw new RuntimeException(e);
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                })
+                .toArray(URL[]::new);
         // System.out.println("HOLLY my classpath is " + Arrays.toString(urls));
         //System.out.println("HOLLY their classpath is " + Arrays.toString(urls));
 
@@ -99,6 +108,8 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
     public Class<?> loadClass(String name) throws ClassNotFoundException {
         System.out.println("HOLLY loading " + name);
         boolean isQuarkusTest = false;
+        // TODO we need to set this properly
+        boolean isMainTest = false;
         // TODO hack that didn't even work
         //        if (runtimeClassLoader != null && name.contains("QuarkusTestProfileAwareClass")) {
         //            return runtimeClassLoader.loadClass(name);
@@ -106,30 +117,95 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
         //            return this.getClass().getClassLoader().loadClass(name);
         //
         //        }
+        // TODO we can almost get away with using a string, except for type safety - maybe a dotname?
+        // TODO since of course avoiding the classload would be ideal
+        // Lots of downstream logic uses the class to work back to the classpath, so we can't just get rid of it (yet)
+        // ... but of course at this stage we don't know anything more about the classpath than anyone else, and are just using the system property
+        // ... so anything using this to get the right information will be disappointed
+        // TODO we should just pass through the moduleInfo, right?
+        Class<?> fromCanary = null;
+
         try {
-            Class<?> fromParent = canaryLoader.loadClass(name);
-            System.out.println("HOLLY canary gave " + fromParent.getClassLoader());
+            if (otherLoader != null) {
+                try {
+                    // TODO this is dumb, we are only loading it so that other stuff can discover a classpath from it
+                    fromCanary = otherLoader
+                            .loadClass(name);
+                } catch (ClassNotFoundException e) {
+                    System.out.println("Could not load with the OTHER loader " + name);
+                    System.out.println("Used class path " + classesPath);
+                    return super.loadClass(name);
+                }
+            } else {
+                try {
+                    fromCanary = canaryLoader.loadClass(name);
+                } catch (ClassNotFoundException e) {
+                    System.out.println("Could not load with the canary " + name);
+                    //       System.out.println("Used class path " + System.getProperty("java.class.path"));
+                    return super.loadClass(name);
+                }
+            }
 
-            // TODO want to exclude quarkus component test, but include quarkusmaintest - what about quarkusunittest? and quarkusintegrationtest?
-            // TODO knowledge of test annotations leaking in to here - should we have a superclass that lives in this package that we check for?
-            // TODO be tighter with the names we check for
-            // TODO this would be way easier if this was in the same module as the profile, could just do clazz.getAnnotation(TestProfile.class)
-            isQuarkusTest = Arrays.stream(fromParent.getAnnotations())
-                    .anyMatch(annotation -> annotation.annotationType().getName().endsWith("QuarkusTest"));
-            boolean isMainTest = Arrays.stream(fromParent.getAnnotations())
-                    .anyMatch(annotation -> annotation.annotationType().getName().endsWith("QuarkusMainTest"));
-            Optional<Annotation> profileAnnotation = Arrays.stream(fromParent.getAnnotations())
-                    .filter(annotation -> annotation.annotationType().getName().endsWith("TestProfile")).findFirst();
+            System.out.println("HOLLY yay! did load " + name);
+            System.out.println("ANNOTATIONS " + Arrays.toString(fromCanary.getAnnotations()));
+            Arrays.stream(fromCanary.getAnnotations())
+                    .map(Annotation::annotationType)
+                    .forEach(o -> System.out.println("annotation tyoe " + o));
+
             String profileName = "no-profile";
-            Class profile = null;
-            if (profileAnnotation.isPresent()) {
+            Class<?> profile = null;
+            if (profiles != null) {
+                // TODO the good is that we're re-using what JUnitRunner already worked out, the bad is that this is seriously clunky with multiple code paths, brittle information sharing ...
+                // TODO at the very least, should we have a test landscape holder class?
+                isMainTest = quarkusMainTestClasses.contains(name);
+                // The JUnitRunner counts main tests as quarkus tests
+                isQuarkusTest = quarkusTestClasses.contains(name) && !isMainTest;
 
-                System.out.println("HOLLY got an annotation! " + profileAnnotation.get());
-                // TODO could do getAnnotationsByType if we were in the same module
-                Method m = profileAnnotation.get().getClass().getMethod("value");
-                profile = (Class) m.invoke(profileAnnotation.get()); // TODO extends quarkustestprofile
-                System.out.println("HOLLY profile is " + profile);
-                profileName = profile.getName();
+                profileName = profiles.get(name);
+                if (profileName == null) {
+                    profileName = "no-profile";
+                }
+            } else {
+                // TODO JUnitRunner already worked all this out for the dev mode case, could we share some logic?
+
+                isQuarkusTest = Arrays.stream(fromCanary.getAnnotations())
+                        .anyMatch(annotation -> annotation.annotationType()
+                                .getName()
+                                .endsWith("QuarkusTest"));
+
+                // TODO want to exclude quarkus component test, but include quarkusmaintest - what about quarkusunittest? and quarkusintegrationtest?
+                // TODO knowledge of test annotations leaking in to here, although JUnitTestRunner also has the same leak - should we have a superclass that lives in this package that we check for?
+                // TODO be tighter with the names we check for
+                // TODO this would be way easier if this was in the same module as the profile, could just do clazz.getAnnotation(TestProfile.class)
+                isMainTest = Arrays.stream(fromCanary.getAnnotations())
+                        .anyMatch(annotation -> annotation.annotationType()
+                                .getName()
+                                .endsWith("QuarkusMainTest"));
+
+                System.out.println("HOLLY canary gave " + fromCanary.getClassLoader());
+
+                Optional<Annotation> profileAnnotation = Arrays.stream(fromCanary.getAnnotations())
+                        .filter(annotation -> annotation.annotationType()
+                                .getName()
+                                .endsWith("TestProfile"))
+                        .findFirst();
+                if (profileAnnotation.isPresent()) {
+
+                    System.out.println("HOLLY got an annotation! " + profileAnnotation.get());
+                    // TODO could do getAnnotationsByType if we were in the same module
+                    Method m = profileAnnotation.get()
+                            .getClass()
+                            .getMethod("value");
+                    profile = (Class) m.invoke(profileAnnotation.get()); // TODO extends quarkustestprofile
+                    System.out.println("HOLLY profile is " + profile);
+                    profileName = profile.getName();
+                }
+            }
+
+            if (!"no-profile".equals(profileName)) {
+                //TODO is this the right classloader to use?
+                profile = Class.forName(profileName);
+                System.out.println("HOLLY setting profile to " + profile);
             }
 
             // increment the key unconditionally, we just need uniqueness
@@ -145,9 +221,10 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
             System.out.println("HOLLY key 2 " + key);
             if (isQuarkusTest || isMainTest) {
                 System.out.println("HOLLY attempting to load " + name);
-                QuarkusClassLoader runtimeClassLoader = getQuarkusClassLoader(key, fromParent, profile);
+                QuarkusClassLoader runtimeClassLoader = getQuarkusClassLoader(key, fromCanary, profile);
                 System.out.println("the rc parent is " + runtimeClassLoader.getParent());
-                System.out.println("the grand- parent is " + runtimeClassLoader.getParent().getParent());
+                System.out.println("the grand- parent is " + runtimeClassLoader.getParent()
+                        .getParent());
                 Class thing = runtimeClassLoader.loadClass(name);
                 System.out.println("HOLLY did load " + thing);
                 return thing;
@@ -155,17 +232,15 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
                 System.out.println("HOLLY sending to " + super.getName());
                 return super.loadClass(name);
             }
-        } catch (ClassNotFoundException e) {
-            System.out.println("Could not load with the canary " + name);
-            return super.loadClass(name);
+
         } catch (NoSuchMethodException e) {
-            System.out.println("Could not load with the canary " + e);
+            System.out.println("Could get method " + e);
             throw new RuntimeException(e);
         } catch (InvocationTargetException e) {
-            System.out.println("Could not load with the canary " + e);
+            System.out.println("Could not invoke " + e);
             throw new RuntimeException(e);
         } catch (IllegalAccessException e) {
-            System.out.println("Could not load with the canary " + e);
+            System.out.println("Could not access " + e);
             throw new RuntimeException(e);
         }
     }
@@ -176,13 +251,16 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
         // we reload the test resources if we changed test class and the new test class is not a nested class, and if we had or will have per-test test resources
         //  boolean reloadTestResources = isNewTestClass && (hasPerTestResources || hasPerTestResources(extensionContext));
         //  if ((state == null && !failedBoot)) { //  TODO never reload, as it will not work || wrongProfile || reloadTestResources) {
-        // TODO diagnostic
-        profile = null;
+
         QuarkusClassLoader runtimeClassLoader = runtimeClassLoaders.get(key);
         if (runtimeClassLoader == null) {
             try {
                 runtimeClassLoader = makeClassLoader(key, requiredTestClass, profile);
-                runtimeClassLoaders.put(key, runtimeClassLoader);
+                // TODO diagnostic, assume everything is a per-test resource
+                boolean hasPerTestResources = profile != null;
+                if (!hasPerTestResources) {
+                    runtimeClassLoaders.put(key, runtimeClassLoader);
+                }
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
@@ -239,9 +317,42 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
             Collection shutdownTasks = new HashSet();
 
             String displayName = "JUnit" + key; // TODO come up with a good display name
-            curatedApplication = appMakerHelper.makeCuratedApplication(requiredTestClass, displayName, shutdownTasks);
+            curatedApplication = appMakerHelper.makeCuratedApplication(requiredTestClass, displayName,
+                    shutdownTasks);
             curatedApplications.put(key, curatedApplication);
+
         }
+
+        // TODO this is the cut-pasted code from JUnitTestRUnner, is it the same?
+        // TODO need to pass through the 'is continuous testing?
+        //        ClassLoader rcl = rcls.get(profileName);
+        //        System.out.println("HOLLY rcl is " + rcl);
+        //        //  rcl = null; // TODO diagnostics
+        //        try {
+        //            if (rcl == null) {
+        //                System.out.println("HOLLY Making a java start with " + testApplication);
+        //                // Although it looks like we need to start once per class, the class is just indicative of where classes for this module live
+        //
+        //                Class profile = null;
+        //                // TODO diagnostics
+        //                if (!"no-profile".equals(profileName)) {
+        //                    //TODO is this the right classloader to use?
+        //                    profile = Class.forName(profileName);
+        //                    System.out.println("HOLLY setting profile to " + profile);
+        //                }
+        //                // CuratedApplications cannot (right now) be re-used between restarts. So even though the builder gave us a
+        //                // curated application, don't use it.
+        //                // TODO can we make the app re-usable, or otherwise leverage the app that we got passed in?
+        //                System.out.println("HOLLY will make an app using profile " + profile);
+        //                rcl = new AppMakerHelper()
+        //                        .getStartupAction(Thread.currentThread().getContextClassLoader().loadClass(i), null,
+        //                                true, profile);
+        //                rcls.put(profileName, rcl);
+        //            }
+        //            // TODO do we need to set a TCCL? Behaviour seems the same either way
+        //            Thread.currentThread().setContextClassLoader(rcl);
+        //
+        //            System.out.println("639 HOLLY loading quarkus test with " + Thread.currentThread().getContextClassLoader());
 
         //        System.out.println("MAKING Curated application with root " + applicationRoot);
         //
@@ -314,6 +425,7 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
         //        final QuarkusBootstrap.Mode currentMode = curatedApplication.getQuarkusBootstrap()
         //                .getMode();
         // TODO are all these args used?
+        // TODO we are hardcoding is continuous testing to the wrong value!
         QuarkusClassLoader loader = appMakerHelper.getStartupAction(requiredTestClass,
                 curatedApplication, false, profile);
 
@@ -335,5 +447,42 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
     public void close() throws IOException {
         // TODO clearly, an implementation is needed!
 
+    }
+
+    public void setProfiles(Map<String, String> profiles) {
+        this.profiles = profiles;
+    }
+
+    public void setClassPath(String classesPath) {
+        this.classesPath = classesPath;
+        System.out.println("HOLLY setting other classpath to " + classesPath);
+        URL[] urls = Arrays.stream(classesPath.split(":"))
+                .map(s -> {
+                    try {
+                        //TODO what if it's not a file?
+                        String spec = "file://" + s;
+
+                        if (!spec.endsWith("jar") && !spec.endsWith("/")) {
+                            spec = spec + "/";
+                        }
+                        //    System.out.println("HOLLY added " + new URL(spec) + new URL(spec).openStream().available());
+                        return new URL(spec);
+                    } catch (MalformedURLException e) {
+                        throw new RuntimeException(e);
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                })
+                .toArray(URL[]::new);
+        System.out.println("HOLLY urls is  " + Arrays.toString(urls));
+        otherLoader = new URLClassLoader(urls, null);
+    }
+
+    public void setQuarkusTestClasses(Set<String> quarkusTestClasses) {
+        this.quarkusTestClasses = quarkusTestClasses;
+    }
+
+    public void setQuarkusMainTestClasses(Set<String> quarkusMainTestClasses) {
+        this.quarkusMainTestClasses = quarkusMainTestClasses;
     }
 }

@@ -593,6 +593,7 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
     }
 
     private QuarkusTestExtensionState ensureStarted(ExtensionContext extensionContext) {
+        System.out.println("HOLLY ensure started for " + extensionContext.getRequiredTestClass() + ".");
         QuarkusTestExtensionState state = getState(extensionContext);
         Class<? extends QuarkusTestProfile> selectedProfile = getQuarkusTestProfile(extensionContext);
 
@@ -607,10 +608,14 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
             currentJUnitTestClass = extensionContext.getRequiredTestClass();
         }
         boolean isNewApplication = isNewApplication(state, currentJUnitTestClass);
+        System.out.println("HOLLY " + extensionContext.getRequiredTestClass() + " is new " + isNewApplication);
+        System.out.println("HOLLY reasons " + Objects.equals(extensionContext.getRequiredTestClass(), currentJUnitTestClass)
+                + extensionContext.getRequiredTestClass() + " cuurr" + currentJUnitTestClass);
 
         if ((state == null && !failedBoot) || isNewApplication) {
             if (isNewApplication) {
                 if (state != null) {
+                    System.out.println("HOLLY closing old one");
                     try {
                         state.close();
                     } catch (Throwable throwable) {

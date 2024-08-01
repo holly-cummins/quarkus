@@ -460,7 +460,7 @@ public class CuratedApplication implements Serializable, AutoCloseable {
 
     // TODO delete this? the model doesn't really work?
     public void tidy() {
-        //    this.runtimeClassLoader = null;
+        this.runtimeClassLoader = null;
     }
 
     /**

@@ -76,11 +76,10 @@ public class StartupContext implements Closeable {
     }
 
     private void runAllAndClear(Deque<Runnable> tasks) {
-        System.out.println("HOLLY run all and clear");
+        System.out.println("HOLLY startup context run all and clear");
         while (!tasks.isEmpty()) {
             try {
                 var runnable = tasks.remove();
-                System.out.println("HOLLY wull run " + runnable);
                 runnable.run();
             } catch (Throwable ex) {
                 LOG.error("Running a shutdown task failed", ex);

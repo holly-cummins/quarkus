@@ -81,7 +81,10 @@ public class StartupActionImpl implements StartupAction {
             // TODO Need to do recreations in JUnitTestRunner for dev mode case
             // TODO This is wrong, since it should be re-created for every startup
             // TODO need to clear it on shutdown
-            runtimeClassLoader = curatedApplication.getOrCreateRuntimeClassLoader(
+            //            runtimeClassLoader = curatedApplication.getOrCreateRuntimeClassLoader(
+            //                    resources, transformedClasses);
+            // TODO diagnostics
+            runtimeClassLoader = curatedApplication.createRuntimeClassLoader(
                     resources, transformedClasses);
         }
         this.runtimeClassLoader = runtimeClassLoader;

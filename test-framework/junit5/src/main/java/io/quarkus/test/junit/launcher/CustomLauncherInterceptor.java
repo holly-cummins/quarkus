@@ -74,7 +74,10 @@ public class CustomLauncherInterceptor implements LauncherInterceptor {
     public void close() {
 
         try {
-            facadeLoader.close();
+            // Tidy up classloaders we created, but not ones created upstream
+            if (facadeLoader != null) {
+                facadeLoader.close();
+            }
         } catch (Exception e) {
             throw new RuntimeException("Failed to close custom classloader", e);
         }
