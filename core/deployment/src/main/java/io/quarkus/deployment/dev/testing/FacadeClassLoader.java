@@ -75,9 +75,13 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
     private Set<String> quarkusMainTestClasses;
 
     public FacadeClassLoader(ClassLoader parent) {
+        // We need to set the super or things don't work on paths which use the maven isolated classloader, such as google cloud functions tests
+        // It seems something in that path is using a method other than loadClass(), and so the inherited method can't do the right thing without a parent
+        super(parent);
         // TODO in dev mode, sometimes this is the deployment classloader, which doesn't seem right?
         System.out.println("HOLLY facade parent is " + parent);
         this.parent = parent;
+        // TODO if this is launched with a launcher, java.class.path may not be correct - see https://maven.apache.org/surefire/maven-surefire-plugin/examples/class-loading.html
         String classPath = System.getProperty("java.class.path");
         // This manipulation is needed to work in IDEs
         URL[] urls = Arrays.stream(classPath.split(":"))
@@ -102,6 +106,11 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
         //System.out.println("HOLLY their classpath is " + Arrays.toString(urls));
 
         canaryLoader = new URLClassLoader(urls, null);
+    }
+
+    public Class<?> noloadClass(String name) throws ClassNotFoundException {
+        System.out.println("HOLLY bypass load on class " + name);
+        return parent.loadClass(name);
     }
 
     @Override
@@ -141,8 +150,15 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
                     fromCanary = canaryLoader.loadClass(name);
                 } catch (ClassNotFoundException e) {
                     System.out.println("Could not load with the canary " + name);
+                    System.out.println("will try with parent " + parent);
+                    try {
+                        parent.loadClass(name);
+                    } catch (ClassNotFoundException e2) {
+                        System.out.println("Could not load with the parent " + name);
+                    }
                     //       System.out.println("Used class path " + System.getProperty("java.class.path"));
-                    return super.loadClass(name);
+                    //  return super.loadClass(name);
+                    return parent.loadClass(name);
                 }
             }
 

@@ -780,6 +780,7 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
     }
 
     private void initTestState(ExtensionContext extensionContext, QuarkusTestExtensionState state) {
+        System.out.println("HOLLY initTestState");
         try {
             //            actualTestClass = Class.forName(extensionContext.getRequiredTestClass().getName(), true,
             //                    Thread.currentThread().getContextClassLoader());
@@ -813,6 +814,7 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
 
     private Object createActualTestInstance(Class<?> testClass, QuarkusTestExtensionState state)
             throws ClassNotFoundException, IllegalAccessException, InvocationTargetException, NoSuchMethodException {
+        System.out.println("HOLLY creating actual test instance " + testClass);
         Object testInstance = runningQuarkusApplication.instance(testClass);
 
         Class<?> resM = Thread.currentThread().getContextClassLoader().loadClass(TestHTTPResourceManager.class.getName());

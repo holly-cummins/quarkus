@@ -2,7 +2,6 @@ package io.quarkus.test.junit.launcher;
 
 import org.junit.platform.launcher.LauncherInterceptor;
 
-import io.quarkus.bootstrap.classloading.QuarkusClassLoader;
 import io.quarkus.deployment.dev.testing.FacadeClassLoader;
 
 public class CustomLauncherInterceptor implements LauncherInterceptor {
@@ -40,7 +39,7 @@ public class CustomLauncherInterceptor implements LauncherInterceptor {
         System.out.println("Interceipt, TCCL is " + old + Thread.currentThread());
         // Don't make a facade loader if the JUnitRunner got there ahead of us
         // they set a runtime classloader so handle that too
-        if (!(old instanceof FacadeClassLoader) || old instanceof QuarkusClassLoader && old.getName().contains("Runtime")) {
+        if (!(old instanceof FacadeClassLoader)) {
             System.out.println(
                     "HOLLY intercept constructing a classloader ------------------------------" + Thread.currentThread());
             try {

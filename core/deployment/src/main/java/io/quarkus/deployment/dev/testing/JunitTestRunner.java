@@ -758,9 +758,12 @@ public class JunitTestRunner {
         System.out.println("classload thread is " + Thread.currentThread());
 
         // TODO what is the right parent? this way of getting an app classloader is super-fragile
-        ClassLoader parent = this.getClass()
-                .getClassLoader()
-                .getParent();
+        // ... but is the system one the one we want? surefire sometimes uses an isolated classloader, other launchers might too, but in dev mode we shoud be safe
+        //        ClassLoader parent = this.getClass()
+        //                .getClassLoader()
+        //                .getParent();
+        // TODO this seems logical, but DOES NOT makes integration-test/test-extension/tests fail
+        ClassLoader parent = ClassLoader.getSystemClassLoader();
         System.out.println("HOLLY using parent for facade loader " + parent);
         FacadeClassLoader facadeClassLoader = new FacadeClassLoader(parent);
 
