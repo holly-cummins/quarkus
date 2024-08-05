@@ -46,6 +46,9 @@ public class DevUIJsonRPCTest {
     public DevUIJsonRPCTest(String namespace, String testUrl) {
         this.namespace = namespace;
         this.testUrl = testUrl;
+        System.out.println("HOLLY config loading TCCL " + Thread.currentThread().getContextClassLoader());
+        System.out.println("HOLLY config loading config ptovider class " + ConfigProvider.class.getClassLoader());
+        System.out.println("HOLLY config loading this class " + this.getClass().getClassLoader());
         String nonApplicationRoot = ConfigProvider.getConfig()
                 .getOptionalValue("quarkus.http.non-application-root-path", String.class).orElse("q");
         if (!nonApplicationRoot.startsWith("/")) {

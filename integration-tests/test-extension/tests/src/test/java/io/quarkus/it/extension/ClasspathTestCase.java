@@ -3,7 +3,6 @@ package io.quarkus.it.extension;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.is;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import io.quarkus.test.junit.DisabledOnIntegrationTest;
@@ -54,8 +53,6 @@ public class ClasspathTestCase {
     }
 
     @Test
-    @Disabled("For some reason, class files are not accessible as resources through the runtime init classloader;"
-            + " that's beside the point of this PR though, so we'll ignore that.")
     public void testRuntimeInitMainClassNoDuplicate() {
         given().param("resourceName", CLASS_FILE)
                 .param("phase", "runtime_init")
@@ -65,6 +62,8 @@ public class ClasspathTestCase {
 
     @Test
     public void testRuntimeInitMainResourceNoDuplicate() {
+        // Runtime classloader classes are stored in memory, as "quarkus:" resources, and we do not have a quarkus filesystem provider
+        // at the moment, the path helper works around that by hacking/reverse engineering a file-based location
         given().param("resourceName", RESOURCE_FILE)
                 .param("phase", "runtime_init")
                 .when().get("/core/classpath").then()

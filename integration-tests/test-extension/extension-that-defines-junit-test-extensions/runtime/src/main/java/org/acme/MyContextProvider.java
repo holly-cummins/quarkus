@@ -2,9 +2,12 @@ package org.acme;
 
 import static java.util.Arrays.asList;
 
+import java.lang.annotation.Annotation;
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Stream;
 
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.extension.Extension;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.ParameterContext;
@@ -17,6 +20,12 @@ public class MyContextProvider implements TestTemplateInvocationContextProvider 
 
     @Override
     public boolean supportsTestTemplate(ExtensionContext extensionContext) {
+        System.out.println("HOLLY checking test template");
+        Annotation[] myAnnotations = extensionContext.getClass().getAnnotations();
+        Assertions.assertTrue(Arrays.toString(myAnnotations).contains("AnnotationAddedByExtensionHAHAHANO"),
+                "The context provider does not see the annotation, only sees " + Arrays.toString(myAnnotations)
+                        + ". The classloader is " + this.getClass().getClassLoader());
+
         return true;
     }
 

@@ -19,7 +19,9 @@ public class AnnotationAdjuster extends ClassVisitor {
 
     @Override
     public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
+        System.out.println("HOLLY AA " + name + signature);
         AnnotationVisitor av = visitAnnotation(SIMPLE_ANNOTATION_TYPENAME, true);
+        System.out.println("HOLLY AA av is " + av);
         Type value = Type.getType(AnnotationAddedByExtension.class);
         if (av != null) {
             av.visit("value", value);
