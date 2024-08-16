@@ -34,6 +34,7 @@ import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
 
+// TODO reinstate this test
 @Disabled("Needs rewrite to match new, simpler, implementation")
 @ExtendWith(MockitoExtension.class)
 class QuarkusTestProfileAwareClassOrdererTest {
