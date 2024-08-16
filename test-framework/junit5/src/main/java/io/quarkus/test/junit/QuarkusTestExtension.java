@@ -288,7 +288,7 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
 
             // TODO infinite loops? also causes all paramstests to fail + 37 failures??
             // ... and doesn't even fix the config problem
-            //        ConfigProviderResolver.setInstance(new RunningAppConfigResolver(runningQuarkusApplication));
+            //            ConfigProviderResolver.setInstance(new RunningAppConfigResolver(runningQuarkusApplication));
             //now we have full config reset the hang timer
             if (hangTaskKey != null) {
                 hangTaskKey.cancel(false);
@@ -393,7 +393,6 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
 
     @Override
     public void beforeTestExecution(ExtensionContext context) throws Exception {
-        System.out.println("TCCL check 392 " + Thread.currentThread().getContextClassLoader());
         if (isNativeOrIntegrationTest(context.getRequiredTestClass()) || isBeforeTestCallbacksEmpty()) {
             return;
         }
@@ -632,7 +631,7 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
             currentJUnitTestClass = extensionContext.getRequiredTestClass();
         }
         System.out.println("HOLLY about to check " + extensionContext.getRequiredTestClass() + " is new app");
-        boolean isNewApplication = isNewApplication(state, currentJUnitTestClass);
+        boolean isNewApplication = isNewApplication(state, extensionContext.getRequiredTestClass());
 
         // TODO if classes are misordered, say because someone overrode the ordering, and there are profiles or resources,
         // we could try to start and application which has already been started, and fail with a mysterious error about

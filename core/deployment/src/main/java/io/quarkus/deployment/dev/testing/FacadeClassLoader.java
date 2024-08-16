@@ -252,11 +252,7 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
                 System.out.println("HOLLY did load " + thing);
                 System.out.println(
                         "HOLLY after cl TCCL is " + Thread.currentThread().getContextClassLoader() + " loaded " + name);
-                if (Thread.currentThread().getContextClassLoader() != this) {
-                    // TODO this should not be needed, sort it out?
-                    // TODO or is this actually a sensible tidy up at the end of creating the application? is leaving itself on the TCCL a sensible thing for create app to do?
-                    Thread.currentThread().setContextClassLoader(this);
-                }
+
                 return thing;
             } else {
                 System.out.println("HOLLY sending to " + super.getName());
@@ -554,9 +550,10 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
 
         // TODO is this a good idea?
         // TODO without this, the parameter dev mode tests regress, but it feels kind of wrong - is there some use of TCCL in JUnitRunner we need to find
-        currentThread.setContextClassLoader(loader);
+        // TODO definitely remove this or devtools tests fail
+        //  currentThread.setContextClassLoader(loader);
 
-        System.out.println("HOLLY did make a " + currentThread.getContextClassLoader());
+        System.out.println("HOLLY at end of classload TCCL is " + currentThread.getContextClassLoader());
         return holder;
 
     }

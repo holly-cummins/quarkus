@@ -556,7 +556,7 @@ public class QuarkusClassLoader extends ClassLoader implements Closeable {
         // and so they cannot be shared. Hackily work around the problem by hardcoding an exception to child-first
         if ((name.contains("io.quarkus.test.junit"))
                 && this.getParent().getName().contains("Base Runtime")) {
-            System.out.println("Wheeeeee! dumping " + name + " to parent " + getParent());
+            System.out.println("Wheeeeee! shunting " + name + " to parent " + getParent());
             return getParent().loadClass(name);
         }
 

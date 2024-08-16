@@ -137,7 +137,7 @@ public class JunitTestRunner {
             long start = System.currentTimeMillis();
             ClassLoader old = Thread.currentThread()
                     .getContextClassLoader();
-            System.out.println("HOLLU junit prepare, old is " + old);
+            System.out.println("HOLLU junit prepare, old TCCL is " + old);
 
             QuarkusClassLoader tcl = testApplication.createDeploymentClassLoader();
             deploymentClassLoader = tcl;
@@ -146,7 +146,7 @@ public class JunitTestRunner {
                             .get()::isDisplayTestOutput);
             Thread.currentThread()
                     .setContextClassLoader(tcl);
-            System.out.println("139 HOLLY junit runner  set classloader to deployment" + tcl);
+            System.out.println("139 HOLLY junit runner  set classloader to deployment TCCL" + tcl);
 
             Set<UniqueId> allDiscoveredIds = new HashSet<>();
             Set<UniqueId> dynamicIds = new HashSet<>();
@@ -443,7 +443,7 @@ public class JunitTestRunner {
                         } finally {
                             Thread.currentThread()
                                     .setContextClassLoader(origCl);
-                            System.out.println("406 HOLLY junit runner set classloader to orig " + origCl);
+                            System.out.println("406 HOLLY junit runner TCCL set classloader to orig " + origCl);
                             synchronized (JunitTestRunner.this) {
                                 testsRunning = false;
                                 if (aborted) {
