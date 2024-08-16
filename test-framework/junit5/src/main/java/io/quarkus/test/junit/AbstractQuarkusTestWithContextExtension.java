@@ -84,10 +84,7 @@ public abstract class AbstractQuarkusTestWithContextExtension extends AbstractTe
     }
 
     protected ExtensionContext.Store getStoreFromContext(ExtensionContext context) {
-        System.out.println("HOLLY getting store " + this.getClass().getClassLoader());
         ExtensionContext root = context.getRoot();
-        System.out.println("HOLLY root " + root);
-        System.out.println("HOLLY store " + root.getStore(ExtensionContext.Namespace.GLOBAL));
         return root.getStore(ExtensionContext.Namespace.GLOBAL);
     }
 
