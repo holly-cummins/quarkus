@@ -368,6 +368,7 @@ public class DevMojoIT extends LaunchMojoTestBase {
 
     @Test
     public void testThatInstrumentationBasedReloadWorks() throws MavenInvocationException, IOException, Exception {
+        // Bear in mind that in the DevMojoIT context, the config seen by the DevUIJsonRPCTest (using this tests's classloader/TCCL) may not be the same as what the app under test sees
         DevUIJsonRPCTest devUIJsonRPCTest = new DevUIJsonRPCTest("devui-continuous-testing", "http://localhost:8080");
         testDir = initProject("projects/classic-inst", "projects/project-instrumentation-reload");
         runAndCheck();
