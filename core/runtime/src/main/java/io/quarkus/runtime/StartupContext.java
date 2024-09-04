@@ -26,7 +26,6 @@ public class StartupContext implements Closeable {
     private String currentBuildStepName;
 
     public StartupContext() {
-        System.out.println("HOLLY SC construcging startup context");
         ShutdownContext shutdownContext = new ShutdownContext() {
             @Override
             public void addShutdownTask(Runnable runnable) {
@@ -47,7 +46,6 @@ public class StartupContext implements Closeable {
             }
         };
         values.put(ShutdownContext.class.getName(), shutdownContext);
-        System.out.println("HOLLY SC put in cl " + ShutdownContext.class.getName() + " is + " + shutdownContext);
         values.put(RAW_COMMAND_LINE_ARGS, new Supplier<String[]>() {
             @Override
             public String[] get() {
@@ -69,14 +67,12 @@ public class StartupContext implements Closeable {
 
     @Override
     public void close() {
-        System.out.println("HOLLY SC YO CLOSING");
         runAllAndClear(shutdownTasks);
         runAllAndClear(lastShutdownTasks);
         values.clear();
     }
 
     private void runAllAndClear(Deque<Runnable> tasks) {
-        System.out.println("HOLLY startup context run all and clear");
         while (!tasks.isEmpty()) {
             try {
                 var runnable = tasks.remove();

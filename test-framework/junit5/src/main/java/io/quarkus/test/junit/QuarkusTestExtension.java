@@ -396,6 +396,7 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
         if (isNativeOrIntegrationTest(context.getRequiredTestClass()) || isBeforeTestCallbacksEmpty()) {
             return;
         }
+
         if (!failedBoot) {
             ClassLoader original = setCCL(runningQuarkusApplication.getClassLoader());
             try {
@@ -609,12 +610,10 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
 
     private QuarkusTestExtensionState ensureStarted(ExtensionContext extensionContext) {
         System.out.println("HOLLY ensure started for " + extensionContext.getRequiredTestClass() + ".");
+        System.out.println(
+                "HOLLY will run " + extensionContext.getRequiredTestClass() + " "
+                        + extensionContext.getRequiredTestClass().getClassLoader());
         QuarkusTestExtensionState state = getState(extensionContext);
-        System.out.println("HOLLY got state " + state);
-        if (state != null) {
-            System.out.println(" , and state cl is " + state.getClass()
-                    .getClassLoader());
-        }
 
         Class<? extends QuarkusTestProfile> selectedProfile = getQuarkusTestProfile(extensionContext);
 

@@ -520,6 +520,10 @@ public class QuarkusClassLoader extends ClassLoader implements Closeable {
     protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
         ensureOpen();
 
+        if (name.contains("acme")) {
+            System.out.println("HOLLY loading " + name + " with " + this);
+        }
+
         for (ClassLoaderEventListener l : classLoaderEventListeners) {
             l.loadClass(name, this.name);
         }
@@ -564,14 +568,21 @@ public class QuarkusClassLoader extends ClassLoader implements Closeable {
                     }
                 }
                 ClassPathElement[] resource = state.loadableResources.get(resourceName);
+
                 if (resource != null) {
-                    if (name.contains("org.acme")) {
+                    if (name.contains("acme")) {
                         System.out.println("checking " + resource[0].getRoot() + " for " + resourceName);
                     }
                     ClassPathElement classPathElement = resource[0];
                     ClassPathResource classPathElementResource = classPathElement.getResource(resourceName);
+                    if (name.contains("acme")) {
+                        System.out.println("did find it in " + classPathElementResource);
+                    }
                     if (classPathElementResource != null) { //can happen if the class loader was closed
                         byte[] data = classPathElementResource.getData();
+                        if (name.equals("com.acme.ResourceTest")) {
+                            System.out.println("CONTENT DUMP " + new String(data));
+                        }
                         definePackage(name, classPathElement);
                         Class<?> cl = defineClass(name, data, 0, data.length,
                                 protectionDomains.computeIfAbsent(classPathElement, ClassPathElement::getProtectionDomain));
@@ -582,7 +593,7 @@ public class QuarkusClassLoader extends ClassLoader implements Closeable {
                     }
                 }
 
-                if (name.contains("org.acme")) {
+                if (name.contains("acme")) {
                     System.out.println("HOLLY ok, problem " + this + " can't find " + name);
                 }
                 if (!parentFirst) {

@@ -29,7 +29,6 @@ import org.junit.jupiter.api.extension.ParameterResolver;
 import org.junit.jupiter.api.extension.ReflectiveInvocationContext;
 
 import io.quarkus.bootstrap.app.StartupAction;
-import io.quarkus.bootstrap.classloading.QuarkusClassLoader;
 import io.quarkus.bootstrap.logging.InitialConfigurator;
 import io.quarkus.bootstrap.logging.QuarkusDelayedHandler;
 import io.quarkus.deployment.dev.testing.LogCapturingOutputFilter;
@@ -198,7 +197,11 @@ public class QuarkusMainTestExtension extends AbstractJvmQuarkusTestExtension
         TracingHandler.quarkusStarting();
         Closeable testResourceManager = null;
         try {
-            StartupAction startupAction = ((QuarkusClassLoader) requiredTestClass.getClassLoader()).getStartupAction();
+
+            // We need to start each test method in its own classloader because of the @Launch annotations which keep starting applications
+            // Note that this is very different from how QuarkusTestExtension now behaves
+            // TODO is there more work needed to make this deviation from the pattern in QuarkusTestExtension work? Or more stuff to take out of QuarkusTestExtension?
+            StartupAction startupAction = prepareResult.augmentAction.createInitialRuntimeApplication();
             Thread.currentThread().setContextClassLoader(startupAction.getClassLoader());
             QuarkusConsole.installRedirects();
             flushAllLoggers();
