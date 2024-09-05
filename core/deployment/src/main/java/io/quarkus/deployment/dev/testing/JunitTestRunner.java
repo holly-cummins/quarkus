@@ -823,7 +823,7 @@ public class JunitTestRunner {
             //we need to work the unit test magic
             //this is a lot more complex
             //we need to transform the classes to make the tracing magic work
-            // this won't be the right classloader for some profiles, but the original implementation also used a single one
+            // this won't be the right classloader for some profiles, but that is ok because it's only for vanilla tests
 
             System.out.println("HOLLY asking classloader " + deploymentClassLoader);
             Set<String> classesToTransform = new HashSet<>(deploymentClassLoader.getLocalClassNames());

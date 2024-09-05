@@ -582,9 +582,6 @@ public class QuarkusClassLoader extends ClassLoader implements Closeable {
                     }
                     if (classPathElementResource != null) { //can happen if the class loader was closed
                         byte[] data = classPathElementResource.getData();
-                        if (name.equals("com.acme.ResourceTest")) {
-                            System.out.println("CONTENT DUMP " + new String(data));
-                        }
                         definePackage(name, classPathElement);
                         Class<?> cl = defineClass(name, data, 0, data.length,
                                 protectionDomains.computeIfAbsent(classPathElement, ClassPathElement::getProtectionDomain));

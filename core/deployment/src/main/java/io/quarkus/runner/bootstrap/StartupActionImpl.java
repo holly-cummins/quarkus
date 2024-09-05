@@ -79,11 +79,6 @@ public class StartupActionImpl implements StartupAction {
             baseClassLoader.reset(extractGeneratedResources(buildResult, false),
                     transformedClasses);
             // TODO Need to do recreations in JUnitTestRunner for dev mode case
-            // TODO This is wrong, since it should be re-created for every startup
-            // TODO need to clear it on shutdown
-            //            runtimeClassLoader = curatedApplication.getOrCreateRuntimeClassLoader(
-            //                    resources, transformedClasses);
-            // TODO diagnostics
             runtimeClassLoader = curatedApplication.createRuntimeClassLoader(
                     resources, transformedClasses);
         }

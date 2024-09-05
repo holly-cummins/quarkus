@@ -715,6 +715,7 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
             ClassLoader old = Thread.currentThread().getContextClassLoader();
             try {
                 Thread.currentThread().setContextClassLoader(runningQuarkusApplication.getClassLoader());
+                // TODO this is now redundant, we can just get the class from requiredTestClass
                 invokeBeforeClassCallbacks(Class.class,
                         runningQuarkusApplication.getClassLoader().loadClass(requiredTestClass.getName()));
             } finally {

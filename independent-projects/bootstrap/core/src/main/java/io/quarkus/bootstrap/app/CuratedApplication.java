@@ -450,14 +450,6 @@ public class CuratedApplication implements Serializable, AutoCloseable {
         augmentationElements.clear();
     }
 
-    public QuarkusClassLoader getOrCreateRuntimeClassLoader(Map<String, byte[]> resources,
-            Map<String, byte[]> transformedClasses) {
-        if (runtimeClassLoader == null) {
-            runtimeClassLoader = createRuntimeClassLoader(resources, transformedClasses);
-        }
-        return runtimeClassLoader;
-    }
-
     // TODO delete this? the model doesn't really work?
     public void tidy() {
         this.runtimeClassLoader = null;
