@@ -1,6 +1,7 @@
 package io.quarkus.deployment.dev.testing;
 
 import java.io.Closeable;
+import java.io.File;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
@@ -93,17 +94,14 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
         String classPath = System.getProperty("java.class.path");
         // This manipulation is needed to work in IDEs
         URL[] urls = Arrays.stream(classPath.split(":"))
-                .map(s -> {
+                .map(spec -> {
                     try {
-                        //TODO what if it's not a file?
-                        String spec = "file://" + s;
-
-                        if (!spec.endsWith("jar") && !spec.endsWith("/")) {
-                            spec = spec + "/";
+                        // TODO is this adjustment even needed?
+                        if (!spec.endsWith("jar") && !spec.endsWith(File.separator)) {
+                            spec = spec + File.separator;
                         }
-                        //TODO should be a proper url encode - hopefully that fixes spaces, too? - the test to run to validate is QuestionMarkInPathIntegrationTestIT
-                        spec = spec.replace("?", "%3F");
-                        return new URL(spec);
+
+                        return Path.of(spec).toUri().toURL();
                     } catch (MalformedURLException e) {
                         throw new RuntimeException(e);
                     } catch (IOException e) {
@@ -154,6 +152,25 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
                     fromCanary = canaryLoader.loadClass(name);
                 } catch (ClassNotFoundException e) {
                     System.out.println("Could not load with the canary " + name);
+                    // TODO diagnostics for windows failures, remove this
+                    if (name.contains("love")) {
+                        System.out.println("Used classpath" + System.getProperty("java.class.path"));
+                        Arrays.stream(System.getProperty("java.class.path").split(":"))
+                                .map(spec -> {
+                                    try {
+                                        if (!spec.endsWith("jar") && !spec.endsWith("/")) {
+                                            spec = spec + "/";
+                                        }
+
+                                        return Path.of(spec).toUri().toURL();
+                                    } catch (MalformedURLException ee) {
+                                        throw new RuntimeException(ee);
+                                    } catch (IOException ee) {
+                                        throw new RuntimeException(ee);
+                                    }
+                                })
+                                .forEach(System.out::println);
+                    }
                     System.out.println("will try with parent " + parent);
                     try {
                         parent.loadClass(name);
@@ -167,7 +184,6 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
             }
 
             System.out.println("HOLLY canary did load " + name);
-            System.out.println("ANNOTATIONS " + Arrays.toString(fromCanary.getAnnotations()));
             Arrays.stream(fromCanary.getAnnotations())
                     .map(Annotation::annotationType)
                     .forEach(o -> System.out.println("annotation tyoe " + o));
@@ -577,16 +593,13 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
         this.classesPath = classesPath;
         System.out.println("HOLLY setting other classpath to " + classesPath);
         URL[] urls = Arrays.stream(classesPath.split(":"))
-                .map(s -> {
+                .map(spec -> {
                     try {
-                        //TODO what if it's not a file?
-                        String spec = "file://" + s;
-
                         if (!spec.endsWith("jar") && !spec.endsWith("/")) {
                             spec = spec + "/";
                         }
-                        //    System.out.println("HOLLY added " + new URL(spec) + new URL(spec).openStream().available());
-                        return new URL(spec);
+
+                        return Path.of(spec).toUri().toURL();
                     } catch (MalformedURLException e) {
                         throw new RuntimeException(e);
                     } catch (IOException e) {

@@ -225,7 +225,7 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
             System.clearProperty("test.url");
             Map<String, String> additional = new HashMap<>();
             QuarkusTestProfile profileInstance = getQuarkusTestProfile(profile, shutdownTasks, additional);
-            StartupAction startupAction = ((QuarkusClassLoader) requiredTestClass.getClassLoader()).getStartupAction();
+            StartupAction startupAction = getClassLoaderFromTestClass(requiredTestClass).getStartupAction();
 
             System.out.println("HOLLY made initial app");
             // TODO this might be a good idea, but if so, we'd need to undo it
@@ -353,6 +353,15 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
                     "TCCL check 348 " + Thread.currentThread().getContextClassLoader() + " ( original is " + originalCl);
         }
 
+    }
+
+    private static QuarkusClassLoader getClassLoaderFromTestClass(Class<?> requiredTestClass) {
+        try {
+            return (QuarkusClassLoader) requiredTestClass.getClassLoader();
+        } catch (ClassCastException e) {
+            throw new RuntimeException("Internal error. The test class " + requiredTestClass
+                    + " could not be loaded by the Quarkus classloader. This should not happen, but changing directory names or class layout may help work around the issue.");
+        }
     }
 
     private Throwable determineEffectiveException(Throwable e) {
