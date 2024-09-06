@@ -156,8 +156,10 @@ public class MainClassBuildStep {
         scField.setModifiers(Modifier.PUBLIC | Modifier.STATIC);
 
         MethodCreator ctor = file.getMethodCreator("<init>", void.class);
+        // TODO this is arbitrary thrashing around and needs sorting out; the google funqy tests fail unless isAuxiliaryApplication is false, but it needs to be true for dev mode reload to work (and it should be true, logically)
+        ResultHandle load = ctor.load(false); // TODO diagnostic ctor.load(launchMode.isAuxiliaryApplication());
         ctor.invokeSpecialMethod(ofMethod(Application.class, "<init>", void.class, boolean.class),
-                ctor.getThis(), ctor.load(launchMode.isAuxiliaryApplication()));
+                ctor.getThis(), load);
         ctor.returnValue(null);
 
         MethodCreator mv = file.getMethodCreator("<clinit>", void.class);
