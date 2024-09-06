@@ -255,6 +255,21 @@ public class AppMakerHelper {
                 .bootstrap();
         shutdownTasks.add(curatedApplication::close);
 
+        // TODO can we consolidate some of this with TestSupport? The code over there is
+        //        final QuarkusBootstrap.Builder bootstrapConfig = curatedApplication.getQuarkusBootstrap().clonedBuilder()
+        //                                                                           .setMode(QuarkusBootstrap.Mode.TEST)
+        //                                                                           .setAssertionsEnabled(true)
+        //                                                                           .setDisableClasspathCache(false)
+        //                                                                           .setIsolateDeployment(true)
+        //                                                                           .setExistingModel(null)
+        //                                                                           .setBaseClassLoader(getClass().getClassLoader().getParent())
+        //                                                                           .setTest(true)
+        //                                                                           .setAuxiliaryApplication(true)
+        //                                                                           .setHostApplicationIsTestOnly(devModeType == DevModeType.TEST_ONLY)
+        //                                                                           .setProjectRoot(projectDir)
+        //                                                                           .setApplicationRoot(getRootPaths(module, mainModule))
+        //                                                                           .clearLocalArtifacts();
+
         return curatedApplication;
     }
 
