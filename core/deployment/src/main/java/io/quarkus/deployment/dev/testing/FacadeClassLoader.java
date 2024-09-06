@@ -68,6 +68,7 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
      * delegating
      * classloader
      * // TODO should we use the canary loader, or the parent loader?
+     * // TODO we need to close this when we're done
      * //If we use the parent loader, does that stop the quarkus classloaders getting a crack at some classes?
      */
     private final ClassLoader canaryLoader;
@@ -88,6 +89,7 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
         System.out.println("HOLLY facade parent is " + parent);
         this.parent = parent;
         // TODO if this is launched with a launcher, java.class.path may not be correct - see https://maven.apache.org/surefire/maven-surefire-plugin/examples/class-loading.html
+        // TODO paths with spaces in them break this - and at the moment, no test catches that
         String classPath = System.getProperty("java.class.path");
         // This manipulation is needed to work in IDEs
         URL[] urls = Arrays.stream(classPath.split(":"))
@@ -99,7 +101,8 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
                         if (!spec.endsWith("jar") && !spec.endsWith("/")) {
                             spec = spec + "/";
                         }
-                        //    System.out.println("HOLLY added " + new URL(spec) + new URL(spec).openStream().available());
+                        //TODO should be a proper url encode - hopefully that fixes spaces, too? - the test to run to validate is QuestionMarkInPathIntegrationTestIT
+                        spec = spec.replace("?", "%3F");
                         return new URL(spec);
                     } catch (MalformedURLException e) {
                         throw new RuntimeException(e);
@@ -112,11 +115,6 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
         //System.out.println("HOLLY their classpath is " + Arrays.toString(urls));
 
         canaryLoader = new URLClassLoader(urls, null);
-    }
-
-    public Class<?> noloadClass(String name) throws ClassNotFoundException {
-        System.out.println("HOLLY bypass load on class " + name);
-        return parent.loadClass(name);
     }
 
     @Override
@@ -200,6 +198,8 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
                 // TODO knowledge of test annotations leaking in to here, although JUnitTestRunner also has the same leak - should we have a superclass that lives in this package that we check for?
                 // TODO be tighter with the names we check for
                 // TODO this would be way easier if this was in the same module as the profile, could just do clazz.getAnnotation(TestProfile.class)
+
+                // TODO QuarkusMainTest should not be included in here, since it runs tests the 'old' way
                 isMainTest = Arrays.stream(fromCanary.getAnnotations())
                         .anyMatch(annotation -> annotation.annotationType()
                                 .getName()
@@ -249,7 +249,7 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
                 System.out.println("the grand- parent is " + runtimeClassLoader.getParent()
                         .getParent());
                 Class thing = runtimeClassLoader.loadClass(name);
-                System.out.println("HOLLY did load " + thing);
+                System.out.println("HOLLY did load " + thing + " using CL " + thing.getClassLoader());
                 System.out.println(
                         "HOLLY after cl TCCL is " + Thread.currentThread().getContextClassLoader() + " loaded " + name);
 
