@@ -1,5 +1,7 @@
 package io.quarkus.deployment.dev.testing;
 
+import static io.quarkus.test.common.PathTestHelper.getTestClassesLocation;
+
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
@@ -153,7 +155,7 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
                 } catch (ClassNotFoundException e) {
                     System.out.println("Could not load with the canary " + name);
                     // TODO diagnostics for windows failures, remove this
-                    if (name.contains("love")) {
+                    if (name.contains("love") || name.contains("acme")) {
                         System.out.println("Used classpath" + System.getProperty("java.class.path"));
                         Arrays.stream(System.getProperty("java.class.path").split(":"))
                                 .map(spec -> {
@@ -173,12 +175,15 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
                     }
                     System.out.println("will try with parent " + parent);
                     try {
-                        parent.loadClass(name);
+                        Class clazz = parent.loadClass(name);
+                        System.out.println("parent found it as " + getTestClassesLocation(clazz));
+
                     } catch (ClassNotFoundException e2) {
                         System.out.println("Could not load with the parent " + name);
                     }
                     //       System.out.println("Used class path " + System.getProperty("java.class.path"));
                     //  return super.loadClass(name);
+                    // TODO we do this load twice in a row, silly
                     return parent.loadClass(name);
                 }
             }
