@@ -30,6 +30,9 @@ import java.util.jar.Manifest;
 
 import org.jboss.logging.Logger;
 
+import io.quarkus.bootstrap.app.CuratedApplication;
+import io.quarkus.bootstrap.app.StartupAction;
+
 /**
  * The ClassLoader used for non production Quarkus applications (i.e. dev and test mode).
  */
@@ -45,6 +48,9 @@ public class QuarkusClassLoader extends ClassLoader implements Closeable {
 
     protected static final String META_INF_SERVICES = "META-INF/services/";
     protected static final String JAVA = "java.";
+
+    private final CuratedApplication curatedApplication;
+    private StartupAction startupAction;
 
     static {
         registerAsParallelCapable();
@@ -159,6 +165,7 @@ public class QuarkusClassLoader extends ClassLoader implements Closeable {
         this.aggregateParentResources = builder.aggregateParentResources;
         this.classLoaderEventListeners = builder.classLoaderEventListeners.isEmpty() ? Collections.emptyList()
                 : builder.classLoaderEventListeners;
+        this.curatedApplication = builder.curatedApplication;
         setDefaultAssertionStatus(builder.assertionsEnabled);
 
         if (lifecycleLog.isDebugEnabled()) {
@@ -513,12 +520,33 @@ public class QuarkusClassLoader extends ClassLoader implements Closeable {
     protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
         ensureOpen();
 
+        if (name.contains("acme")) {
+            System.out.println("HOLLY loading " + name + " with " + this);
+        }
+
         for (ClassLoaderEventListener l : classLoaderEventListeners) {
             l.loadClass(name, this.name);
         }
         if (name.startsWith(JAVA)) {
             return parent.loadClass(name);
         }
+
+        //
+        // TODO this is a big hack, can we find another way?
+        // Test support classes will be loaded by the runtime, we want them to be loaded by the base runtime
+        // Otherwise they can't share state classes
+        // TODO would it work for the jar to configure them as parent first?
+
+        // The Quarkus test extensions put classes into the JUnit store to communicate between instances
+        // If the test classes are loaded with the runtime classloader, some of these state classes will be as well,
+        // and so they cannot be shared. Hackily work around the problem by hardcoding an exception to child-first
+        // Note that the mockito classes need to be loaded with the proper classloader
+        // TODO make this less hacky and fragile and prone to cause terrible problems!
+        if (name.contains("io.quarkus.test.junit") && !name.contains("io.quarkus.test.junit.mockito")
+                && this.getParent().getName().contains("Base Runtime")) {
+            return getParent().loadClass(name);
+        }
+
         //even if the thread is interrupted we still want to be able to load classes
         //if the interrupt bit is set then we clear it and restore it at the end
         boolean interrupted = Thread.interrupted();
@@ -542,9 +570,16 @@ public class QuarkusClassLoader extends ClassLoader implements Closeable {
                     }
                 }
                 ClassPathElement[] resource = state.loadableResources.get(resourceName);
+
                 if (resource != null) {
+                    if (name.contains("acme")) {
+                        System.out.println("checking " + resource[0].getRoot() + " for " + resourceName);
+                    }
                     ClassPathElement classPathElement = resource[0];
                     ClassPathResource classPathElementResource = classPathElement.getResource(resourceName);
+                    if (name.contains("acme")) {
+                        System.out.println("did find it in " + classPathElementResource);
+                    }
                     if (classPathElementResource != null) { //can happen if the class loader was closed
                         byte[] data = classPathElementResource.getData();
                         definePackage(name, classPathElement);
@@ -557,9 +592,13 @@ public class QuarkusClassLoader extends ClassLoader implements Closeable {
                     }
                 }
 
+                if (name.contains("acme")) {
+                    System.out.println("HOLLY ok, problem " + this + " can't find " + name);
+                }
                 if (!parentFirst) {
                     return parent.loadClass(name);
                 }
+
                 throw new ClassNotFoundException(name);
             }
 
@@ -729,9 +768,21 @@ public class QuarkusClassLoader extends ClassLoader implements Closeable {
         }
     }
 
+    public CuratedApplication getCuratedApplication() {
+        return curatedApplication;
+    }
+
     @Override
     public String toString() {
         return "QuarkusClassLoader:" + name + "@" + Integer.toHexString(hashCode());
+    }
+
+    public StartupAction getStartupAction() {
+        return startupAction;
+    }
+
+    public void setStartupAction(StartupAction startupAction) {
+        this.startupAction = startupAction;
     }
 
     public static class Builder {
@@ -742,6 +793,7 @@ public class QuarkusClassLoader extends ClassLoader implements Closeable {
         final List<ClassPathElement> parentFirstElements = new ArrayList<>();
         final List<ClassPathElement> lesserPriorityElements = new ArrayList<>();
         final boolean parentFirst;
+        CuratedApplication curatedApplication;
         MemoryClassPathElement resettableElement;
         private Map<String, byte[]> transformedClasses = Collections.emptyMap();
         boolean aggregateParentResources;
@@ -867,6 +919,11 @@ public class QuarkusClassLoader extends ClassLoader implements Closeable {
             return this;
         }
 
+        public Builder setCuratedApplication(CuratedApplication curatedApplication) {
+            this.curatedApplication = curatedApplication;
+            return this;
+        }
+
         /**
          * Builds the class loader
          *
@@ -888,7 +945,7 @@ public class QuarkusClassLoader extends ClassLoader implements Closeable {
         return parent;
     }
 
-    static final class ClassLoaderState {
+    public static final class ClassLoaderState {
 
         final Map<String, ClassPathElement[]> loadableResources;
         final Set<String> bannedResources;

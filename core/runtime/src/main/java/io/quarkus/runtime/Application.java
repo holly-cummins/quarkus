@@ -68,7 +68,17 @@ public abstract class Application implements Closeable {
      *           letting the user hook into it.
      */
     public final void start(String[] args) {
-        if (!auxiliaryApplication) {
+        System.out.println(this.getClass().getClassLoader() + "HOLLY starting application, " +
+                auxiliaryApplication + " and the current current is " + currentApplication);
+        /*
+         * We can't make assumptions about the order that the main and auxiliary application get created.
+         * Because the test application gets created quite early in the test lifecycle, it usually beats the main application.
+         * In order to avoid returning null from getCurrentApplication and causing catastrophe in all the lambda tests, just use
+         * the auxiliary application if it's all we have
+         */
+        // TODO this is all still a bit brittle and fragile; can we do better? maybe even formally linked pairs of applications?
+        // TODO are there any negative consequences to using the auxiliary application as the current one?
+        if (!auxiliaryApplication || currentApplication == null) {
             currentApplication = this;
         }
         final Lock stateLock = this.stateLock;
