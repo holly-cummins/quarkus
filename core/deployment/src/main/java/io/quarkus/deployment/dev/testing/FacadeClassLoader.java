@@ -95,7 +95,7 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
         // TODO paths with spaces in them break this - and at the moment, no test catches that
         String classPath = System.getProperty("java.class.path");
         // This manipulation is needed to work in IDEs
-        URL[] urls = Arrays.stream(classPath.split(":"))
+        URL[] urls = Arrays.stream(classPath.split(File.pathSeparator))
                 .map(spec -> {
                     try {
                         // TODO is this adjustment even needed?
@@ -157,11 +157,11 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
                     // TODO diagnostics for windows failures, remove this
                     if (name.contains("love") || name.contains("acme")) {
                         System.out.println("Used classpath" + System.getProperty("java.class.path"));
-                        Arrays.stream(System.getProperty("java.class.path").split(":"))
+                        Arrays.stream(System.getProperty("java.class.path").split(File.pathSeparator))
                                 .map(spec -> {
                                     try {
-                                        if (!spec.endsWith("jar") && !spec.endsWith("/")) {
-                                            spec = spec + "/";
+                                        if (!spec.endsWith("jar") && !spec.endsWith(File.separator)) {
+                                            spec = spec + File.separator;
                                         }
 
                                         return Path.of(spec).toUri().toURL();
@@ -597,11 +597,11 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
     public void setClassPath(String classesPath) {
         this.classesPath = classesPath;
         System.out.println("HOLLY setting other classpath to " + classesPath);
-        URL[] urls = Arrays.stream(classesPath.split(":"))
+        URL[] urls = Arrays.stream(classesPath.split(File.pathSeparator))
                 .map(spec -> {
                     try {
-                        if (!spec.endsWith("jar") && !spec.endsWith("/")) {
-                            spec = spec + "/";
+                        if (!spec.endsWith("jar") && !spec.endsWith(File.separator)) {
+                            spec = spec + File.separator;
                         }
 
                         return Path.of(spec).toUri().toURL();
