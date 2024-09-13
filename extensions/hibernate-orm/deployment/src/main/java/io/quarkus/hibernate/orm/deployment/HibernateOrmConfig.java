@@ -157,7 +157,7 @@ public interface HibernateOrmConfig {
          * and support for those older versions becomes too unreliable.
          * * you should still plan a migration of your schema to a newer version of Hibernate ORM.
          * For help with migration, refer to
-         * link:https://github.com/quarkusio/quarkus/wiki/Migration-Guide-3.0:-Hibernate-ORM-5-to-6-migration[the Quarkus 3
+         * link:https://github.com/quarkusio/quarkus/wiki/Migration-Guide-3.0-Hibernate-ORM-5-to-6-migration[the Quarkus 3
          * migration guide from Hibernate ORM 5 to 6].
          *
          * @asciidoclet

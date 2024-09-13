@@ -259,7 +259,7 @@ public final class FastBootHibernatePersistenceProvider implements PersistencePr
                     + " backwards-incompatible changes of Hibernate ORM 6."
                     + " It is also inherently unstable and may stop working in future versions of Quarkus."
                     + " Consider migrating your application to native Hibernate ORM 6 behavior;"
-                    + " see https://github.com/quarkusio/quarkus/wiki/Migration-Guide-3.0:-Hibernate-ORM-5-to-6-migration for more information.",
+                    + " see https://github.com/quarkusio/quarkus/wiki/Migration-Guide-3.0-Hibernate-ORM-5-to-6-migration for more information.",
                     persistenceUnitName,
                     HibernateOrmRuntimeConfig.puPropertyKey(persistenceUnitName, "database.orm-compatibility.version"),
                     databaseOrmCompatibilityVersion.externalRepresentation,

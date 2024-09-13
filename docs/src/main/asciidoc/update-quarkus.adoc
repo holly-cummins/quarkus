@@ -24,7 +24,7 @@ Post-update, if expected updates are missing, consider the following reasons:
 
 [IMPORTANT]
 ====
-For projects that use Hibernate ORM or Hibernate Reactive, review the link:https://github.com/quarkusio/quarkus/wiki/Migration-Guide-3.0:-Hibernate-ORM-5-to-6-migration[Hibernate ORM 5 to 6 migration] quick reference.
+For projects that use Hibernate ORM or Hibernate Reactive, review the link:https://github.com/quarkusio/quarkus/wiki/Migration-Guide-3.0-Hibernate-ORM-5-to-6-migration[Hibernate ORM 5 to 6 migration] quick reference.
 The following update command covers only a subset of this guide.
 ====
 
