@@ -12,5 +12,5 @@ public final class DotNames {
     public static final DotName EXTEND_WITH = DotName.createSimple(ExtendWith.class.getName());
     public static final DotName REGISTER_EXTENSION = DotName.createSimple(RegisterExtension.class.getName());
     // TODO this leaks knowledge of the junit5 module into this module
-    public static final DotName QUARKUS_TEST_EXTENSION = DotName.createSimple("io.quarkus.test.junit.QuarkusTextExtension");
+    public static final DotName QUARKUS_TEST_EXTENSION = DotName.createSimple("io.quarkus.test.junit.QuarkusTestExtension");
 }
