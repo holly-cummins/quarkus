@@ -119,7 +119,7 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
 
     @Override
     public Class<?> loadClass(String name) throws ClassNotFoundException {
-        System.out.println("HOLLY loading " + name);
+        System.out.println("HOLLY facade classloader loading " + name);
         boolean isQuarkusTest = false;
         // TODO we need to set this properly
         boolean isMainTest = false;
@@ -231,6 +231,7 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
                 // TODO this would be way easier if this was in the same module as the profile, could just do clazz.getAnnotation(TestProfile.class)
 
                 // TODO QuarkusMainTest should not be included in here, since it runs tests the 'old' way
+                // ... but if we doo include it, need to count ExtendWith
                 isMainTest = Arrays.stream(fromCanary.getAnnotations())
                         .anyMatch(annotation -> annotation.annotationType()
                                 .getName()
