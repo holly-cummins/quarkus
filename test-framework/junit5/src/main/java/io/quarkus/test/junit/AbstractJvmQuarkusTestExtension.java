@@ -130,7 +130,9 @@ public class AbstractJvmQuarkusTestExtension extends AbstractQuarkusTestWithCont
                 : null;
     }
 
-    public static Class<? extends QuarkusTestProfile> getQuarkusTestProfile(Class testClass) {
+    // TODO is it nicer to pass in the test class, or invoke the getter twice?
+    public static Class<? extends QuarkusTestProfile> getQuarkusTestProfile(Class testClass,
+            ExtensionContext extensionContext) {
         // If the current class or any enclosing class in its hierarchy is annotated with `@TestProfile`.
         Class<? extends QuarkusTestProfile> testProfile = findTestProfileAnnotation(testClass);
         if (testProfile != null) {
@@ -138,19 +140,36 @@ public class AbstractJvmQuarkusTestExtension extends AbstractQuarkusTestWithCont
         }
 
         // Otherwise, if the current class is annotated with `@Nested`:
-        while (testClass.isAnnotationPresent(Nested.class)) {
+        if (testClass.isAnnotationPresent(Nested.class)) {
             // let's try to find the `@TestProfile` from the enclosing classes:
-            testProfile = getQuarkusTestProfile(testClass.getEnclosingClass());
+            testProfile = findTestProfileAnnotation(testClass.getEnclosingClass());
             if (testProfile != null) {
                 return testProfile;
             }
+
+            // if not found, let's try the parents
+            Optional<ExtensionContext> parentContext = extensionContext.getParent();
+            while (parentContext.isPresent()) {
+                ExtensionContext currentExtensionContext = parentContext.get();
+                if (currentExtensionContext.getTestClass().isEmpty()) {
+                    break;
+                }
+
+                testProfile = findTestProfileAnnotation(currentExtensionContext.getTestClass().get());
+                if (testProfile != null) {
+                    return testProfile;
+                }
+
+                parentContext = currentExtensionContext.getParent();
+            }
         }
+
         return null;
     }
 
     protected Class<? extends QuarkusTestProfile> getQuarkusTestProfile(ExtensionContext extensionContext) {
         Class testClass = extensionContext.getRequiredTestClass();
-        Class testProfile = getQuarkusTestProfile(testClass);
+        Class testProfile = getQuarkusTestProfile(testClass, extensionContext);
 
         if (testProfile == null && (testClass.isAnnotationPresent(Nested.class))) {
 
