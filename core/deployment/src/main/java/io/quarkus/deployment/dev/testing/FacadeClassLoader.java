@@ -210,10 +210,20 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
             } else {
                 // TODO JUnitRunner already worked all this out for the dev mode case, could we share some logic?
 
+                System.out.println(
+                        "HOLLY annotations is " + Arrays.toString(Arrays.stream(fromCanary.getAnnotations()).toArray()));
+
+                // TODO make this test cleaner + more rigorous
+                // A Quarkus Test could be annotated with @QuarkusTest or with @ExtendWith[... QuarkusTestExtension.class ]
                 isQuarkusTest = Arrays.stream(fromCanary.getAnnotations())
                         .anyMatch(annotation -> annotation.annotationType()
                                 .getName()
-                                .endsWith("QuarkusTest"));
+                                .endsWith("QuarkusTest"))
+                        || Arrays.stream(fromCanary.getAnnotations())
+                                .anyMatch(annotation -> annotation.annotationType()
+                                        .getName()
+                                        .endsWith("org.junit.jupiter.api.extension.ExtendWith")
+                                        && annotation.toString().contains("io.quarkus.test.junit.QuarkusTestExtension.class"));
 
                 // TODO want to exclude quarkus component test, but include quarkusmaintest - what about quarkusunittest? and quarkusintegrationtest?
                 // TODO knowledge of test annotations leaking in to here, although JUnitTestRunner also has the same leak - should we have a superclass that lives in this package that we check for?
