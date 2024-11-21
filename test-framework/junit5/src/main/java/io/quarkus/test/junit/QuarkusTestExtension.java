@@ -360,7 +360,11 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
             return (QuarkusClassLoader) requiredTestClass.getClassLoader();
         } catch (ClassCastException e) {
             throw new RuntimeException("Internal error. The test class " + requiredTestClass
-                    + " could not be loaded by the Quarkus classloader. This should not happen, but changing directory names or class layout may help work around the issue.");
+                    + " was not loaded with the expected classloader. Expected a QuarkusClassLoader loaded with "
+                    + QuarkusClassLoader.class.getClassLoader()
+                    + " but was "
+                    + requiredTestClass.getClassLoader()
+                    + " This should not happen, but changing directory names or class layout may help work around the issue.");
         }
     }
 
@@ -448,6 +452,7 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
                 }
             } finally {
                 setCCL(original);
+                // TODO pretty pointless setting and unsetting, since we wrap the whole execution in this test's CL
             }
         } else {
             throwBootFailureException();
@@ -721,15 +726,15 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
         ensureStarted(context);
         if (runningQuarkusApplication != null) {
             pushMockContext();
-            ClassLoader old = Thread.currentThread().getContextClassLoader();
-            try {
-                Thread.currentThread().setContextClassLoader(runningQuarkusApplication.getClassLoader());
-                // TODO this is now redundant, we can just get the class from requiredTestClass
-                invokeBeforeClassCallbacks(Class.class,
-                        runningQuarkusApplication.getClassLoader().loadClass(requiredTestClass.getName()));
-            } finally {
-                Thread.currentThread().setContextClassLoader(old);
-            }
+
+            // Set the TCCL to be the test class's classloader, for the duration of the execution
+            // TODO almost all the other TCCL-ing will now be redundnant, go through and delete it.
+
+            Thread.currentThread().setContextClassLoader(runningQuarkusApplication.getClassLoader());
+            // TODO this is now redundant, we can just get the class from requiredTestClass
+            invokeBeforeClassCallbacks(Class.class,
+                    runningQuarkusApplication.getClassLoader().loadClass(requiredTestClass.getName()));
+
         } else {
             // can this ever happen?
             invokeBeforeClassCallbacks(Class.class, requiredTestClass);
@@ -860,7 +865,8 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
 
     private Object createActualTestInstance(Class<?> testClass, QuarkusTestExtensionState state)
             throws ClassNotFoundException, IllegalAccessException, InvocationTargetException, NoSuchMethodException {
-        System.out.println("HOLLY creating actual test instance " + testClass);
+        System.out.println(
+                "HOLLY creating actual test instance " + testClass + " TCCL " + Thread.currentThread().getContextClassLoader());
         Object testInstance = runningQuarkusApplication.instance(testClass);
 
         Class<?> resM = Thread.currentThread().getContextClassLoader().loadClass(TestHTTPResourceManager.class.getName());
@@ -1181,6 +1187,7 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
      * since the class instance that is passed to JUnit isn't really used.
      * The actual test instance that is used is the one that is pulled from Arc, which of course will already have its
      * constructor parameters properly resolved
+     * // TODO this comment is probably wrong, we do use the class instance which is passed in
      */
     @Override
     public Object resolveParameter(ParameterContext parameterContext, ExtensionContext extensionContext)

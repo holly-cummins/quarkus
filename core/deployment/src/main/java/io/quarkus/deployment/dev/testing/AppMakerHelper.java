@@ -53,7 +53,6 @@ import io.quarkus.deployment.builditem.TestClassBeanBuildItem;
 import io.quarkus.deployment.builditem.TestClassPredicateBuildItem;
 import io.quarkus.paths.PathList;
 import io.quarkus.runtime.LaunchMode;
-import io.quarkus.runtime.test.TestHttpEndpointProvider;
 import io.quarkus.test.common.PathTestHelper;
 import io.quarkus.test.common.RestorableSystemProperties;
 import io.quarkus.test.junit.QuarkusTestProfile;
@@ -70,7 +69,6 @@ public class AppMakerHelper {
 
     private static Class<?> quarkusTestMethodContextClass;
     private static boolean hasPerTestResources;
-    private static List<Function<Class<?>, String>> testHttpEndpointProviders;
 
     private static List<Object> testMethodInvokers;
 
@@ -344,8 +342,6 @@ public class AppMakerHelper {
         AugmentAction augmentAction = result.augmentAction;
         QuarkusTestProfile profileInstance = result.profileInstance;
 
-        testHttpEndpointProviders = TestHttpEndpointProvider.load();
-
         try {
             System.out.println("HOLLY about to make app for " + testClass);
             StartupAction startupAction = augmentAction.createInitialRuntimeApplication();
@@ -379,7 +375,6 @@ public class AppMakerHelper {
     //        AugmentAction augmentAction = result.augmentAction;
     //        QuarkusTestProfile profileInstance = result.profileInstance;
     //
-    //        testHttpEndpointProviders = TestHttpEndpointProvider.load();
     //        System.out.println(
     //                "CORE MAKER SEES CLASS OF STARTUP " + StartupAction.class.getClassLoader());
     //

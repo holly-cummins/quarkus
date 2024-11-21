@@ -97,9 +97,20 @@ public class RunningQuarkusApplicationImpl implements RunningQuarkusApplication 
 
     @Override
     public Object instance(Class<?> clazz, Annotation... qualifiers) {
+        System.out.println("HOLLY running app getting instance " + clazz);
+        System.out.println("HOLLY using classloader " + classLoader);
+
         try {
-            Class<?> actualClass = Class.forName(clazz.getName(), true,
-                    classLoader);
+            // TODO can we drop the class forname entirely?
+            Class<?> actualClass;
+            if (classLoader == clazz.getClassLoader()) {
+                System.out.println("HOLLY bypassing classloading");
+                actualClass = clazz;
+            } else {
+                System.out.println("HOLLY reloading class");
+                actualClass = Class.forName(clazz.getName(), true,
+                        classLoader);
+            }
             Class<?> cdi = classLoader.loadClass("jakarta.enterprise.inject.spi.CDI");
             Object instance = cdi.getMethod("current").invoke(null);
             Method selectMethod = cdi.getMethod("select", Class.class, Annotation[].class);
