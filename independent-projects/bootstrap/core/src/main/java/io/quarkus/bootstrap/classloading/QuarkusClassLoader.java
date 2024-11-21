@@ -541,7 +541,9 @@ public class QuarkusClassLoader extends ClassLoader implements Closeable {
         // If the test classes are loaded with the runtime classloader, some of these state classes will be as well,
         // and so they cannot be shared. Hackily work around the problem by hardcoding an exception to child-first
         // Note that the mockito classes need to be loaded with the proper classloader
+        // TODO we should undo this and do a better fix in getStoreFromContext instead
         // TODO make this less hacky and fragile and prone to cause terrible problems!
+        // TODO #store
         if (name.contains("io.quarkus.test.junit") && !name.contains("io.quarkus.test.junit.mockito")
                 && this.getParent().getName().contains("Base Runtime")) {
             return getParent().loadClass(name);

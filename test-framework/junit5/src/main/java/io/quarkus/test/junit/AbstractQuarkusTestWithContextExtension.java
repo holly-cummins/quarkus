@@ -84,6 +84,11 @@ public abstract class AbstractQuarkusTestWithContextExtension extends AbstractTe
     }
 
     protected ExtensionContext.Store getStoreFromContext(ExtensionContext context) {
+        // TODO if we would add some ugly code here to jump up to the
+        // system classloader, we could load QuarkusTestExtension with the test's classloader, and
+        // avoid a whole bunch of reflection
+        // TODO #store
+
         ExtensionContext root = context.getRoot();
         return root.getStore(ExtensionContext.Namespace.GLOBAL);
     }

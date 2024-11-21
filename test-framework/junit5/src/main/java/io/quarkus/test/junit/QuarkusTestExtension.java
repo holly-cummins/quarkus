@@ -7,6 +7,7 @@ import static io.quarkus.test.junit.IntegrationTestUtil.getAdditionalTestResourc
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.lang.annotation.Annotation;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadInfo;
 import java.lang.reflect.Constructor;
@@ -19,6 +20,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.AbstractMap;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
@@ -460,14 +462,32 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
         }
     }
 
-    public static String getEndpointPath(ExtensionContext context, List<Function<Class<?>, String>> testHttpEndpointProviders) {
+    public static String getEndpointPath(ExtensionContext context, List<Function<Class<?>, String>> testHttpEndpointProviders)
+            throws ClassNotFoundException {
         String endpointPath = null;
-        TestHTTPEndpoint testHTTPEndpoint = context.getRequiredTestMethod().getAnnotation(TestHTTPEndpoint.class);
+        System.out
+                .println("HOLLY QTE sees annotations is " + Arrays.toString(context.getRequiredTestMethod().getAnnotations()));
+
+        // TestHTTPEndpoint testHTTPEndpoint = context.getRequiredTestMethod().getAnnotation(TestHTTPEndpoint.class);
+        // TODO #store
+        // TODO this reflection can be reverted if the CL is the test's CL
+        Annotation[] annotations = context.getRequiredTestMethod().getAnnotations();
+        Annotation testHTTPEndpoint = null;
+        Class testHTTPEndpointClazz = context.getRequiredTestClass().getClassLoader()
+                .loadClass(TestHTTPEndpoint.class.getName());
+        for (Annotation annotation : annotations) {
+            if (annotation.annotationType().getName().equals(TestHTTPEndpoint.class.getName())) {
+                testHTTPEndpoint = annotation;
+
+            }
+        }
+
+        System.out.println("endpoint is " + testHTTPEndpoint);
         if (testHTTPEndpoint == null) {
             Class<?> clazz = context.getRequiredTestClass();
             while (true) {
                 // go up the hierarchy because most Native tests extend from a regular Quarkus test
-                testHTTPEndpoint = clazz.getAnnotation(TestHTTPEndpoint.class);
+                testHTTPEndpoint = clazz.getAnnotation(testHTTPEndpointClazz);
                 if (testHTTPEndpoint != null) {
                     break;
                 }
@@ -478,16 +498,35 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
             }
         }
         if (testHTTPEndpoint != null) {
+            Object value = "[no value]";
             for (Function<Class<?>, String> i : testHttpEndpointProviders) {
-                endpointPath = i.apply(testHTTPEndpoint.value());
-                if (endpointPath != null) {
-                    break;
+                System.out.println();
+
+                // TODO #store
+                try {
+                    Method m = testHTTPEndpointClazz.getMethod("value");
+
+                    value = m.invoke(testHTTPEndpoint);
+                    System.out.println("Did get value on " + testHTTPEndpoint + " and value wa " + value);
+
+                    endpointPath = i.apply((Class<?>) value);
+                    if (endpointPath != null) {
+                        break;
+                    }
+
+                } catch (NoSuchMethodException e) {
+                    throw new RuntimeException(e);
+                } catch (InvocationTargetException e) {
+                    throw new RuntimeException(e);
+                } catch (IllegalAccessException e) {
+                    throw new RuntimeException(e);
                 }
             }
             if (endpointPath == null) {
-                throw new RuntimeException("Cannot determine HTTP path for endpoint " + testHTTPEndpoint.value()
+                throw new RuntimeException("Cannot determine HTTP path for endpoint " + value
                         + " for test method " + context.getRequiredTestMethod());
             }
+
         }
         if (endpointPath != null) {
             if (endpointPath.indexOf(':') != -1) {
