@@ -1305,10 +1305,14 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
                 + "' disabled because 'quarkus.profile.test.tags' don't match the tags of '" + testProfile + "'");
     }
 
-    public class ExtensionState extends QuarkusTestExtensionState {
+    public static class ExtensionState extends QuarkusTestExtensionState {
 
         public ExtensionState(Closeable testResourceManager, Closeable resource) {
             super(testResourceManager, resource);
+        }
+
+        public ExtensionState(Closeable trm, Closeable resource, Thread shutdownHook) {
+            super(trm, resource, shutdownHook);
         }
 
         @Override

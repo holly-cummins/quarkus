@@ -544,7 +544,9 @@ public class QuarkusClassLoader extends ClassLoader implements Closeable {
         // TODO we should undo this and do a better fix in getStoreFromContext instead
         // TODO make this less hacky and fragile and prone to cause terrible problems!
         // TODO #store
-        if (name.contains("io.quarkus.test.junit") && !name.contains("io.quarkus.test.junit.mockito")
+        // TODO could we just use a map for the state? to save having to clone?
+        if (false && name.contains("QuarkusTestExtensionState") && name.contains("io.quarkus.test.junit")
+                && !name.contains("io.quarkus.test.junit.mockito")
                 && this.getParent().getName().contains("Base Runtime")) {
             return getParent().loadClass(name);
         }
