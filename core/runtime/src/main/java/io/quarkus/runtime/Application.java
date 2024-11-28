@@ -77,8 +77,10 @@ public abstract class Application implements Closeable {
          * the auxiliary application if it's all we have
          */
         // TODO this is all still a bit brittle and fragile; can we do better? maybe even formally linked pairs of applications?
+        // TODO check if this is still needed after fixing the over-eager setting of applications as auxiliary
+        // Or do something else in the calling code so that it does the bootstrap if current is null? some tests do that anyway, like FunqyCloudEventsFunction
         // TODO are there any negative consequences to using the auxiliary application as the current one?
-        if (!auxiliaryApplication || currentApplication == null) {
+        if (!auxiliaryApplication) {// TODO || currentApplication == null) {
             currentApplication = this;
         }
         final Lock stateLock = this.stateLock;
@@ -244,6 +246,7 @@ public abstract class Application implements Closeable {
     }
 
     public static Application currentApplication() {
+        System.out.println("HOLLY sharing current application and auxiliar is " + currentApplication.auxiliaryApplication);
         return currentApplication;
     }
 

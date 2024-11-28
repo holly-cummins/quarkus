@@ -247,7 +247,6 @@ public class AppMakerHelper {
                 .setTest(true)
                 .setTargetDirectory(PathTestHelper.getProjectBuildDir(projectRoot, testClassLocation))
                 .setProjectRoot(projectRoot)
-                .setAuxiliaryApplication(true) // TODO is this always true in this context? I think so, this is test support?
                 .setApplicationRoot(rootBuilder.build())
                 .build()
                 .bootstrap();

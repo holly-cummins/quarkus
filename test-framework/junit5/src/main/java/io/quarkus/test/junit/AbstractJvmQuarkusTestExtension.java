@@ -170,8 +170,13 @@ public class AbstractJvmQuarkusTestExtension extends AbstractQuarkusTestWithCont
     protected Class<? extends QuarkusTestProfile> getQuarkusTestProfile(ExtensionContext extensionContext) {
         Class testClass = extensionContext.getRequiredTestClass();
         Class testProfile = getQuarkusTestProfile(testClass, extensionContext);
+        System.out.println("test profile top level " + testProfile);
 
-        if (testProfile == null && (testClass.isAnnotationPresent(Nested.class))) {
+        if (testProfile != null) {
+            return testProfile;
+        }
+
+        if (testClass.isAnnotationPresent(Nested.class)) {
 
             // This is unlikely to work since we recursed up the test class stack, but err on the side of double-checking?
             // if not found, let's try the parents
