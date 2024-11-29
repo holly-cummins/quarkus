@@ -13,6 +13,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.ServiceLoader;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -51,11 +52,13 @@ import io.quarkus.deployment.builditem.ApplicationClassPredicateBuildItem;
 import io.quarkus.deployment.builditem.TestAnnotationBuildItem;
 import io.quarkus.deployment.builditem.TestClassBeanBuildItem;
 import io.quarkus.deployment.builditem.TestClassPredicateBuildItem;
+import io.quarkus.deployment.builditem.TestProfileBuildItem;
 import io.quarkus.paths.PathList;
 import io.quarkus.runtime.LaunchMode;
 import io.quarkus.test.common.PathTestHelper;
 import io.quarkus.test.common.RestorableSystemProperties;
 import io.quarkus.test.junit.QuarkusTestProfile;
+import io.quarkus.test.junit.buildchain.TestBuildChainCustomizerProducer;
 
 public class AppMakerHelper {
 
@@ -165,7 +168,6 @@ public class AppMakerHelper {
         if (profile != null) {
             props.put(TEST_PROFILE, profile.getName());
         }
-        //TODO copied, not needed - but do need to pass it out quarkusTestProfile = profile;
         return new PrepareResult(curatedApplication
                 .createAugmentor(TestBuildChainFunction.class.getName(), props), profileInstance,
                 curatedApplication, testClassLocation);
@@ -386,7 +388,10 @@ public class AppMakerHelper {
     //
     //    }
 
-    // TODO can we defer this and move it back to the junit5 module?
+    // TODO we have two of these, which is onw too many - delete the ones in the test extension
+    // Also, AbstractJVM uses this, but reaches down to get the one in QuarkusTestExtension, yuck!
+    // TODO potential refectoring before the big commit, pull this out to its own class
+    // TODO compare the contents carefully
     public static class TestBuildChainFunction implements Function<Map<String, Object>, List<Consumer<BuildChainBuilder>>> {
 
         @Override
@@ -491,16 +496,25 @@ public class AppMakerHelper {
                                 .build();
                     }
 
+                    buildChainBuilder.addBuildStep(new BuildStep() {
+                        @Override
+                        public void execute(BuildContext context) {
+                            Object testProfile = stringObjectMap.get(TEST_PROFILE);
+                            if (testProfile != null) {
+                                context.produce(new TestProfileBuildItem(testProfile.toString()));
+                            }
+                        }
+                    }).produces(TestProfileBuildItem.class).build();
+
                 }
             };
             allCustomizers.add(defaultCustomizer);
 
-            // TODO disabled, to avoid dependency issues
             // give other extensions the ability to customize the build chain
-            //            for (TestBuildChainCustomizerProducer testBuildChainCustomizerProducer : ServiceLoader
-            //                    .load(TestBuildChainCustomizerProducer.class, this.getClass().getClassLoader())) {
-            //                allCustomizers.add(testBuildChainCustomizerProducer.produce(testClassesIndex));
-            //            }
+            for (TestBuildChainCustomizerProducer testBuildChainCustomizerProducer : ServiceLoader
+                    .load(TestBuildChainCustomizerProducer.class, this.getClass().getClassLoader())) {
+                allCustomizers.add(testBuildChainCustomizerProducer.produce(testClassesIndex));
+            }
 
             System.out.println("HOLLY done apply");
             return allCustomizers;

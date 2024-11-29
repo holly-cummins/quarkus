@@ -1420,6 +1420,8 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
 
                     List<String> testClassBeans = new ArrayList<>();
 
+                    // TODO re-use these checks in FacadeClassLoader, they're probably better
+                    // Or for bonus points, only do them once
                     List<AnnotationInstance> extendWith = testClassesIndex
                             .getAnnotations(DotNames.EXTEND_WITH);
                     for (AnnotationInstance annotationInstance : extendWith) {
