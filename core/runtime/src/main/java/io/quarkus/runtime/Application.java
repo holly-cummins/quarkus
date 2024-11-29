@@ -75,6 +75,7 @@ public abstract class Application implements Closeable {
          * Because the test application gets created quite early in the test lifecycle, it usually beats the main application.
          * In order to avoid returning null from getCurrentApplication and causing catastrophe in all the lambda tests, just use
          * the auxiliary application if it's all we have
+         * TODO this comment is wrong, delete it
          */
         // TODO this is all still a bit brittle and fragile; can we do better? maybe even formally linked pairs of applications?
         // TODO check if this is still needed after fixing the over-eager setting of applications as auxiliary
