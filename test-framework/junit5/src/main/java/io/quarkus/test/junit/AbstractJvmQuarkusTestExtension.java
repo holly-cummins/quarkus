@@ -94,6 +94,7 @@ public class AbstractJvmQuarkusTestExtension extends AbstractQuarkusTestWithCont
                 curatedApplication, testClassLocation);
     }
 
+    // TODO duplicated with AppMakerHelper, can we consolidate?
     protected static QuarkusTestProfile getQuarkusTestProfile(Class<? extends QuarkusTestProfile> profile,
             Collection<Runnable> shutdownTasks, Map<String, String> additional)
             throws InstantiationException, IllegalAccessException, InvocationTargetException, NoSuchMethodException {
