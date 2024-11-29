@@ -296,7 +296,6 @@ public class TestResourceManager implements Closeable {
         if (profileClassFromTCCL != null) {
             collectMetaAnnotations(profileClassFromTCCL, Class::getSuperclass, uniqueEntries);
         }
-        System.out.println("HOLLY POISON 299 " + testClass);
         for (AnnotationInstance annotation : findQuarkusTestResourceInstances(testClass, index)) {
             try {
                 Class<? extends QuarkusTestResourceLifecycleManager> testResourceClass = loadTestResourceClassFromTCCL(
