@@ -215,7 +215,8 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
 
                 // TODO make this test cleaner + more rigorous
                 // A Quarkus Test could be annotated with @QuarkusTest or with @ExtendWith[... QuarkusTestExtension.class ]
-                isQuarkusTest = Arrays.stream(fromCanary.getAnnotations())
+                // An @interface isn't a quarkus test, and doesn't want its own application; to detect it, just check if it has a superclass
+                isQuarkusTest = fromCanary.getSuperclass() != null && Arrays.stream(fromCanary.getAnnotations())
                         .anyMatch(annotation -> annotation.annotationType()
                                 .getName()
                                 .endsWith("QuarkusTest"))
@@ -232,6 +233,7 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
 
                 // TODO QuarkusMainTest should not be included in here, since it runs tests the 'old' way
                 // ... but if we doo include it, need to count ExtendWith
+
                 isMainTest = Arrays.stream(fromCanary.getAnnotations())
                         .anyMatch(annotation -> annotation.annotationType()
                                 .getName()

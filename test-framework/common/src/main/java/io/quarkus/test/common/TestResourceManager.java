@@ -275,6 +275,7 @@ public class TestResourceManager implements Closeable {
         IndexView index = TestClassIndexer.readIndex(testClassLocation, testClass);
         Set<TestResourceClassEntry> uniqueEntries = new LinkedHashSet<>();
         // reload the test and profile classes in the right CL
+        // TODO check first, we might not need to do this on all paths
         Class<?> testClassFromTCCL;
         Class<?> profileClassFromTCCL;
         try {
@@ -295,6 +296,7 @@ public class TestResourceManager implements Closeable {
         if (profileClassFromTCCL != null) {
             collectMetaAnnotations(profileClassFromTCCL, Class::getSuperclass, uniqueEntries);
         }
+        System.out.println("HOLLY POISON 299 " + testClass);
         for (AnnotationInstance annotation : findQuarkusTestResourceInstances(testClass, index)) {
             try {
                 Class<? extends QuarkusTestResourceLifecycleManager> testResourceClass = loadTestResourceClassFromTCCL(
@@ -424,9 +426,15 @@ public class TestResourceManager implements Closeable {
         // collect all test supertypes for matching per-test targets
         Set<String> testClasses = new HashSet<>();
         Class<?> current = testClass;
-        while (current != Object.class) {
+        // If this gets called for an @interface, the superclass will be null.
+        while (current != Object.class && current != null) {
             testClasses.add(current.getName());
+            // @interface objects may not have a superclass
             current = current.getSuperclass();
+            if (current == null) {
+                throw new RuntimeException("Internal error: The class " + testClass
+                        + " is not a descendant of Object.class, so cannot be a Quarkus test.");
+            }
         }
         current = testClass.getEnclosingClass();
         while (current != null) {
