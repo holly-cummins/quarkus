@@ -107,15 +107,20 @@ public class RunningQuarkusApplicationImpl implements RunningQuarkusApplication 
                 System.out.println("HOLLY bypassing classloading");
                 actualClass = clazz;
             } else {
-                System.out.println("HOLLY reloading class");
+                System.out.println("HOLLY reloading class"); // TODO this should never happen
                 actualClass = Class.forName(clazz.getName(), true,
                         classLoader);
             }
+
             Class<?> cdi = classLoader.loadClass("jakarta.enterprise.inject.spi.CDI");
-            Object instance = cdi.getMethod("current").invoke(null);
+            Object instance = cdi.getMethod("current")
+                    .invoke(null);
             Method selectMethod = cdi.getMethod("select", Class.class, Annotation[].class);
             Object cdiInstance = selectMethod.invoke(instance, actualClass, qualifiers);
-            return selectMethod.getReturnType().getMethod("get").invoke(cdiInstance);
+            return selectMethod.getReturnType()
+                    .getMethod("get")
+                    .invoke(cdiInstance);
+
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
