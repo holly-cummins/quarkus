@@ -7,6 +7,7 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.MalformedURLException;
@@ -25,6 +26,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import org.jboss.logging.Logger;
+import org.junit.jupiter.api.extension.RegisterExtension;
 
 import io.quarkus.bootstrap.app.CuratedApplication;
 import io.quarkus.bootstrap.classloading.QuarkusClassLoader;
@@ -103,7 +105,9 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
                             spec = spec + File.separator;
                         }
 
-                        return Path.of(spec).toUri().toURL();
+                        return Path.of(spec)
+                                .toUri()
+                                .toURL();
                     } catch (MalformedURLException e) {
                         throw new RuntimeException(e);
                     } catch (IOException e) {
@@ -157,14 +161,17 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
                     // TODO diagnostics for windows failures, remove this
                     if (name.contains("love") || name.contains("acme")) {
                         System.out.println("Used classpath" + System.getProperty("java.class.path"));
-                        Arrays.stream(System.getProperty("java.class.path").split(File.pathSeparator))
+                        Arrays.stream(System.getProperty("java.class.path")
+                                .split(File.pathSeparator))
                                 .map(spec -> {
                                     try {
                                         if (!spec.endsWith("jar") && !spec.endsWith(File.separator)) {
                                             spec = spec + File.separator;
                                         }
 
-                                        return Path.of(spec).toUri().toURL();
+                                        return Path.of(spec)
+                                                .toUri()
+                                                .toURL();
                                     } catch (MalformedURLException ee) {
                                         throw new RuntimeException(ee);
                                     } catch (IOException ee) {
@@ -211,7 +218,8 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
                 // TODO JUnitRunner already worked all this out for the dev mode case, could we share some logic?
 
                 System.out.println(
-                        "HOLLY annotations is " + Arrays.toString(Arrays.stream(fromCanary.getAnnotations()).toArray()));
+                        "HOLLY annotations is " + Arrays.toString(Arrays.stream(fromCanary.getAnnotations())
+                                .toArray()));
 
                 // TODO make this test cleaner + more rigorous
                 // A Quarkus Test could be annotated with @QuarkusTest or with @ExtendWith[... QuarkusTestExtension.class ]
@@ -224,7 +232,9 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
                                 .anyMatch(annotation -> annotation.annotationType()
                                         .getName()
                                         .endsWith("org.junit.jupiter.api.extension.ExtendWith")
-                                        && annotation.toString().contains("io.quarkus.test.junit.QuarkusTestExtension.class"));
+                                        && annotation.toString()
+                                                .contains("io.quarkus.test.junit.QuarkusTestExtension")) // TODO should this be an equals(), for performance? Probably can do a better check than toString, which adds an @ and a .class (I think)
+                        || registersQuarkusTestExtension(fromCanary);
 
                 // TODO want to exclude quarkus component test, but include quarkusmaintest - what about quarkusunittest? and quarkusintegrationtest?
                 // TODO knowledge of test annotations leaking in to here, although JUnitTestRunner also has the same leak - should we have a superclass that lives in this package that we check for?
@@ -285,7 +295,8 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
                 Class thing = runtimeClassLoader.loadClass(name);
                 System.out.println("HOLLY did load " + thing + " using CL " + thing.getClassLoader());
                 System.out.println(
-                        "HOLLY after cl TCCL is " + Thread.currentThread().getContextClassLoader() + " loaded " + name);
+                        "HOLLY after cl TCCL is " + Thread.currentThread()
+                                .getContextClassLoader() + " loaded " + name);
 
                 return thing;
             } else {
@@ -303,6 +314,29 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
             System.out.println("Could not access " + e);
             throw new RuntimeException(e);
         }
+    }
+
+    private boolean registersQuarkusTestExtension(Class<?> fromCanary) {
+        Class<?> clazz = fromCanary;
+        while (clazz != null) {
+            for (Field field : clazz.getDeclaredFields()) {
+                // We can't use isAnnotationPresent because the classloader of the JUnit classes will be wrong (the canary classloader rather than our classloader)
+                // TODO will all this searching be dreadfully slow?
+                // TODO redo the canary loader to load JUnit classes with the same classloader as this?
+
+                if (Arrays.stream(field.getAnnotations()).anyMatch(annotation -> annotation.annotationType()
+                        .getName()
+                        .equals(RegisterExtension.class.getName()))) {
+                    if (field.getType().getName()
+                            .equals("io.quarkus.test.junit.QuarkusTestExtension")) {
+                        return true;
+                    }
+                }
+            }
+            clazz = clazz.getSuperclass();
+        }
+
+        return false;
     }
 
     private QuarkusClassLoader getQuarkusClassLoader(String key, Class requiredTestClass, Class profile) {
@@ -333,14 +367,18 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
             AppMakerHelper.PrepareResult result = holder.prepareResult();
             QuarkusTestProfile profileInstance = holder.prepareResult().profileInstance;
 
-            System.out.println("HOLLY TCCL is " + Thread.currentThread().getContextClassLoader());
+            System.out.println("HOLLY TCCL is " + Thread.currentThread()
+                    .getContextClassLoader());
 
-            ClassLoader old = Thread.currentThread().getContextClassLoader();
+            ClassLoader old = Thread.currentThread()
+                    .getContextClassLoader();
             // TODO do we need to set the TCCL, or just make 	at io.quarkus.test.common.TestResourceManager.getUniqueTestResourceClassEntries(TestResourceManager.java:281) not use the TCCL?
 
             // TODO as a general safety thing for  java.lang.ClassCircularityError should we take ourselves off the TCCL while creating the runtime?
 
-            Thread.currentThread().setContextClassLoader(holder.startupAction().getClassLoader());
+            Thread.currentThread()
+                    .setContextClassLoader(holder.startupAction()
+                            .getClassLoader());
             boolean hasPerTestResources;
             try {
                 Closeable testResourceManager = (Closeable) holder.startupAction()
@@ -368,13 +406,16 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
                 System.out.println(
                         "HOLLY has per test resources " + requiredTestClass.getName() + ": " + hasPerTestResources);
             } finally {
-                Thread.currentThread().setContextClassLoader(old); // Which is most likely 'this'
+                Thread.currentThread()
+                        .setContextClassLoader(old); // Which is most likely 'this'
             }
 
             if (hasPerTestResources) {
-                return (QuarkusClassLoader) makeClassLoader(key, requiredTestClass, profile).startupAction().getClassLoader();
+                return (QuarkusClassLoader) makeClassLoader(key, requiredTestClass, profile).startupAction()
+                        .getClassLoader();
             } else {
-                return (QuarkusClassLoader) holder.startupAction().getClassLoader();
+                return (QuarkusClassLoader) holder.startupAction()
+                        .getClassLoader();
             }
 
         } catch (Exception e) {
@@ -395,7 +436,8 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
      */
     static <T> List<T> getAdditionalTestResources(
             QuarkusTestProfile profileInstance, ClassLoader classLoader) {
-        if ((profileInstance == null) || profileInstance.testResources().isEmpty()) {
+        if ((profileInstance == null) || profileInstance.testResources()
+                .isEmpty()) {
             return Collections.emptyList();
         }
 
@@ -408,7 +450,9 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
             List<T> result = new ArrayList<>(testResources.size());
             for (QuarkusTestProfile.TestResourceEntry testResource : testResources) {
                 T instance = (T) testResourceClassEntryConstructor.newInstance(
-                        Class.forName(testResource.getClazz().getName(), true, classLoader), testResource.getArgs(),
+                        Class.forName(testResource.getClazz()
+                                .getName(), true, classLoader),
+                        testResource.getArgs(),
                         null, testResource.isParallel());
                 result.add(instance);
             }
@@ -580,7 +624,8 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
         AppMakerHelper.DumbHolder holder = appMakerHelper.getStartupAction(requiredTestClass,
                 curatedApplication, false, profile);
 
-        QuarkusClassLoader loader = (QuarkusClassLoader) holder.startupAction().getClassLoader();
+        QuarkusClassLoader loader = (QuarkusClassLoader) holder.startupAction()
+                .getClassLoader();
 
         // TODO is this a good idea?
         // TODO without this, the parameter dev mode tests regress, but it feels kind of wrong - is there some use of TCCL in JUnitRunner we need to find
@@ -617,7 +662,9 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
                             spec = spec + File.separator;
                         }
 
-                        return Path.of(spec).toUri().toURL();
+                        return Path.of(spec)
+                                .toUri()
+                                .toURL();
                     } catch (MalformedURLException e) {
                         throw new RuntimeException(e);
                     } catch (IOException e) {

@@ -309,7 +309,10 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
                     TracingHandler.quarkusStopping();
                     System.out.println("HOLLY shutting down");
                     try {
-                        runningQuarkusApplication.close();
+                        // In a nested class with no tests in the outer profile, the running Quarkus application could be null
+                        if (runningQuarkusApplication != null) {
+                            runningQuarkusApplication.close();
+                        }
                     } catch (Exception e) {
                         throw new RuntimeException(e);
                     } finally {
@@ -361,12 +364,19 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
         try {
             return (QuarkusClassLoader) requiredTestClass.getClassLoader();
         } catch (ClassCastException e) {
-            throw new RuntimeException("Internal error. The test class " + requiredTestClass
-                    + " was not loaded with the expected classloader. Expected a QuarkusClassLoader loaded with "
-                    + QuarkusClassLoader.class.getClassLoader()
-                    + " but was "
-                    + requiredTestClass.getClassLoader()
-                    + " This should not happen, but changing directory names or class layout may help work around the issue.");
+            if (requiredTestClass.getClassLoader().getName().contains("QuarkusClassLoader")) {
+                throw new RuntimeException("Internal error. The test class " + requiredTestClass
+                        + " was not loaded with the expected classloader. Expected a QuarkusClassLoader loaded with "
+                        + QuarkusClassLoader.class.getClassLoader()
+                        + " but was "
+                        + requiredTestClass.getClassLoader()
+                        + " This should not happen, but changing directory names or class layout may help work around the issue.");
+            } else {
+                throw new RuntimeException("Internal error. The test class " + requiredTestClass
+                        + " should have been loaded with a QuarkusClassLoader, but instead it was loaded with "
+                        + requiredTestClass.getClassLoader()
+                        + ". This is caused by the FacadeClassLoader not correctly identifying this class as a QuarkusTest.");
+            }
         }
     }
 
@@ -669,12 +679,21 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
         QuarkusTestExtensionState state = getState(extensionContext);
 
         Class<? extends QuarkusTestProfile> selectedProfile = getQuarkusTestProfile(extensionContext);
+        System.out.println("HOLLY got profile " + selectedProfile);
+
+        boolean wrongProfile = !Objects.equals(selectedProfile, quarkusTestProfile);
+        boolean isNested = isNested(currentJUnitTestClass, extensionContext.getRequiredTestClass());
+        System.out.println("HOLLY compared " + selectedProfile + " to " + quarkusTestProfile + " so " + wrongProfile);
+        if (wrongProfile && isNested) {
+            throw new TestInstantiationException("@Nested tests may not contain @TestProfile annotations.");
+        }
 
         // TODO all this check should go to the facade classloader, and we just need to know if it's started or not, and close the previous one if not
+        // the one bit of this check we need here is the ones relating to nested classes, and profiles
         // TODO we also need to hope the tests are in the right order, and re-order them so we don't rely on luck (will that be ok? def better doc it)
         // we reset the failed state if we changed test class and the new test class is not a nested class
         boolean isNewTestClass = !Objects.equals(extensionContext.getRequiredTestClass(), currentJUnitTestClass)
-                && !isNested(currentJUnitTestClass, extensionContext.getRequiredTestClass());
+                && !isNested;
         System.out.println("HOLLY reasons current class equals static var: "
                 + Objects.equals(extensionContext.getRequiredTestClass(), currentJUnitTestClass) + " "
                 + extensionContext.getRequiredTestClass() + " cuurr" + currentJUnitTestClass);
@@ -683,11 +702,12 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
             currentJUnitTestClass = extensionContext.getRequiredTestClass();
         }
         System.out.println("HOLLY about to check " + extensionContext.getRequiredTestClass() + " is new app");
-        boolean isNewApplication = isNewApplication(state, extensionContext.getRequiredTestClass());
+        boolean isNewApplication = isNewApplication(state, extensionContext.getRequiredTestClass()); // TODO diagnostic
 
         // TODO if classes are misordered, say because someone overrode the ordering, and there are profiles or resources,
         // we could try to start and application which has already been started, and fail with a mysterious error about
         // null shutdown contexts; we should try and detect that case, and give a friendlier error message
+        // TODO we should also support multiple starts on the same app
         // TODO we could either keep track of applications we've already seen, or just detect the null shutdown context and explain a likely cause
         System.out.println("HOLLY " + extensionContext.getRequiredTestClass() + " is new app " + isNewApplication);
 
@@ -704,7 +724,8 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
             }
             PropertyTestUtil.setLogFileProperty();
             try {
-                System.out.println("doing java start for " + extensionContext.getRequiredTestClass());
+                System.out.println(
+                        "doing java start for " + extensionContext.getRequiredTestClass() + " with profile " + selectedProfile);
                 //TODO done later, and better, act of desperation
                 Thread.currentThread().setContextClassLoader(extensionContext.getRequiredTestClass().getClassLoader());
                 state = doJavaStart(extensionContext, selectedProfile);
