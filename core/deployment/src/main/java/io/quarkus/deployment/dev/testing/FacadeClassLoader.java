@@ -222,9 +222,10 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
                                 .toArray()));
 
                 // TODO make this test cleaner + more rigorous
-                // A Quarkus Test could be annotated with @QuarkusTest or with @ExtendWith[... QuarkusTestExtension.class ]
-                // An @interface isn't a quarkus test, and doesn't want its own application; to detect it, just check if it has a superclass
-                isQuarkusTest = fromCanary.getSuperclass() != null && Arrays.stream(fromCanary.getAnnotations())
+                // A Quarkus Test could be annotated with @QuarkusTest or with @ExtendWith[... QuarkusTestExtension.class ] or @RegisterExtension
+                // An @interface isn't a quarkus test, and doesn't want its own application; to detect it, just check if it has a superclass - except that fails for things whose superclass isn't on the classpath, like javax.tools subclasses
+                // TODO we probably need to walk the class hierarchy for the annotations, too? or do they get added to getAnnotations?
+                isQuarkusTest = !fromCanary.isAnnotation() && Arrays.stream(fromCanary.getAnnotations())
                         .anyMatch(annotation -> annotation.annotationType()
                                 .getName()
                                 .endsWith("QuarkusTest"))
@@ -318,22 +319,35 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
 
     private boolean registersQuarkusTestExtension(Class<?> fromCanary) {
         Class<?> clazz = fromCanary;
-        while (clazz != null) {
-            for (Field field : clazz.getDeclaredFields()) {
-                // We can't use isAnnotationPresent because the classloader of the JUnit classes will be wrong (the canary classloader rather than our classloader)
-                // TODO will all this searching be dreadfully slow?
-                // TODO redo the canary loader to load JUnit classes with the same classloader as this?
+        try {
+            while (clazz != null) {
+                // TODO this call is not safe in our nobbled classloader, which is sort of surprising since I thought declared meant 'on this class' but I guess it needs to be able to access the parent
+                for (Field field : clazz.getDeclaredFields()) {
+                    // We can't use isAnnotationPresent because the classloader of the JUnit classes will be wrong (the canary classloader rather than our classloader)
+                    // TODO will all this searching be dreadfully slow?
+                    // TODO redo the canary loader to load JUnit classes with the same classloader as this?
 
-                if (Arrays.stream(field.getAnnotations()).anyMatch(annotation -> annotation.annotationType()
-                        .getName()
-                        .equals(RegisterExtension.class.getName()))) {
-                    if (field.getType().getName()
-                            .equals("io.quarkus.test.junit.QuarkusTestExtension")) {
-                        return true;
+                    if (Arrays.stream(field.getAnnotations())
+                            .anyMatch(annotation -> annotation.annotationType()
+                                    .getName()
+                                    .equals(RegisterExtension.class.getName()))) {
+                        if (field.getType()
+                                .getName()
+                                .equals("io.quarkus.test.junit.QuarkusTestExtension")) {
+                            return true;
+                        }
                     }
                 }
+
+                clazz = clazz.getSuperclass();
             }
-            clazz = clazz.getSuperclass();
+        } catch (NoClassDefFoundError e) {
+            // Because the canary loader doesn't have a parent, this is possible
+            // We also see this error in getDeclaredFields(), which is more surprising to me
+            // If it happens, assume it's ok
+            // It's very unlikely something on the app classloader will extend quarkus test
+            // TODO suppress error once we know this is safe
+            System.out.println("HOLLY could not get parent of " + clazz.getName() + " got error " + e);
         }
 
         return false;
