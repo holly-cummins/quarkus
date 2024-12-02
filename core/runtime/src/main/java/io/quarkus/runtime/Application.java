@@ -68,8 +68,6 @@ public abstract class Application implements Closeable {
      *           letting the user hook into it.
      */
     public final void start(String[] args) {
-        System.out.println(this.getClass().getClassLoader() + "HOLLY starting application, " +
-                auxiliaryApplication + " and the current current is " + currentApplication);
         /*
          * We can't make assumptions about the order that the main and auxiliary application get created.
          * Because the test application gets created quite early in the test lifecycle, it usually beats the main application.
