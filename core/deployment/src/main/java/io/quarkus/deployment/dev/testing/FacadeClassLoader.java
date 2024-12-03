@@ -85,6 +85,7 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
     private QuarkusClassLoader deploymentClassloader;
     private Set<String> quarkusTestClasses;
     private Set<String> quarkusMainTestClasses;
+    private boolean isAuxiliaryApplication;
 
     public FacadeClassLoader(ClassLoader parent) {
         // We need to set the super or things don't work on paths which use the maven isolated classloader, such as google cloud functions tests
@@ -234,7 +235,9 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
                                         .getName()
                                         .endsWith("org.junit.jupiter.api.extension.ExtendWith")
                                         && annotation.toString()
-                                                .contains("io.quarkus.test.junit.QuarkusTestExtension")) // TODO should this be an equals(), for performance? Probably can do a better check than toString, which adds an @ and a .class (I think)
+                                                .contains(
+                                                        "io.quarkus.test.junit.QuarkusTestExtension")) // TODO should this be an equals(), for performance? Probably can do a better check than toString, which adds an @ and a .class
+                        // (I think)
                         || registersQuarkusTestExtension(fromCanary);
 
                 // TODO want to exclude quarkus component test, but include quarkusmaintest - what about quarkusunittest? and quarkusintegrationtest?
@@ -526,7 +529,7 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
             Collection shutdownTasks = new HashSet();
 
             String displayName = "JUnit" + key; // TODO come up with a good display name
-            curatedApplication = appMakerHelper.makeCuratedApplication(requiredTestClass, displayName,
+            curatedApplication = appMakerHelper.makeCuratedApplication(requiredTestClass, displayName, isAuxiliaryApplication,
                     shutdownTasks);
             curatedApplications.put(key, curatedApplication);
 
@@ -636,7 +639,7 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
         // TODO are all these args used?
         // TODO we are hardcoding is continuous testing to the wrong value!
         AppMakerHelper.DumbHolder holder = appMakerHelper.getStartupAction(requiredTestClass,
-                curatedApplication, false, profile);
+                curatedApplication, isAuxiliaryApplication, profile);
 
         QuarkusClassLoader loader = (QuarkusClassLoader) holder.startupAction()
                 .getClassLoader();
@@ -696,5 +699,9 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
 
     public void setQuarkusMainTestClasses(Set<String> quarkusMainTestClasses) {
         this.quarkusMainTestClasses = quarkusMainTestClasses;
+    }
+
+    public void setAuxiliaryApplication(boolean b) {
+        this.isAuxiliaryApplication = b;
     }
 }

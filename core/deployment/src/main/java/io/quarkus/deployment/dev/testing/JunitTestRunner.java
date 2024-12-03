@@ -767,6 +767,7 @@ public class JunitTestRunner {
         System.out.println("HOLLY using parent for facade loader " + parent);
         FacadeClassLoader facadeClassLoader = new FacadeClassLoader(parent);
 
+        facadeClassLoader.setAuxiliaryApplication(true);
         // TODO clumsy hack, consolidate logic properly
         facadeClassLoader.setProfiles(profiles);
         facadeClassLoader.setClassPath(moduleInfo.getTest()

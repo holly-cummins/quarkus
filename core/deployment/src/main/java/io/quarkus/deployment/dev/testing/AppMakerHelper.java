@@ -100,20 +100,23 @@ public class AppMakerHelper {
     }
 
     // TODO Re-used from AbstractJvmQuarkusTestExtension, delete it there
-    private PrepareResult createAugmentor(ExtensionContext context, CuratedApplication curatedApplication,
+    // TODO never used here, delete it
+    private PrepareResult createAugmentor(ExtensionContext context, boolean isContinuousTesting,
+            CuratedApplication curatedApplication,
             Class<? extends QuarkusTestProfile> profile,
             Collection<Runnable> shutdownTasks) throws Exception {
-        return createAugmentor(context.getRequiredTestClass(), context.getDisplayName(), curatedApplication, profile,
+        return createAugmentor(context.getRequiredTestClass(), context.getDisplayName(), isContinuousTesting,
+                curatedApplication, profile,
                 shutdownTasks);
     }
 
-    private PrepareResult createAugmentor(final Class<?> requiredTestClass, String displayName,
+    private PrepareResult createAugmentor(final Class<?> requiredTestClass, String displayName, boolean isContinuousTesting,
             CuratedApplication curatedApplication,
             Class<? extends QuarkusTestProfile> profile,
             Collection<Runnable> shutdownTasks) throws Exception {
 
         if (curatedApplication == null) {
-            curatedApplication = makeCuratedApplication(requiredTestClass, displayName, shutdownTasks);
+            curatedApplication = makeCuratedApplication(requiredTestClass, displayName, isContinuousTesting, shutdownTasks);
         }
         Path testClassLocation = getTestClassLocationIncludingPossibilityOfGradleModel(requiredTestClass);
 
@@ -173,7 +176,7 @@ public class AppMakerHelper {
                 curatedApplication, testClassLocation);
     }
 
-    CuratedApplication makeCuratedApplication(Class<?> requiredTestClass, String displayName,
+    CuratedApplication makeCuratedApplication(Class<?> requiredTestClass, String displayName, boolean isContinuousTesting,
             Collection<Runnable> shutdownTasks) throws IOException, AppModelResolverException, BootstrapException {
         final PathList.Builder rootBuilder = PathList.builder();
         Consumer<Path> addToBuilderIfConditionMet = path -> {
@@ -247,6 +250,8 @@ public class AppMakerHelper {
                 .setIsolateDeployment(true)
                 .setMode(QuarkusBootstrap.Mode.TEST)
                 .setTest(true)
+                .setAuxiliaryApplication(isContinuousTesting)
+
                 .setTargetDirectory(PathTestHelper.getProjectBuildDir(projectRoot, testClassLocation))
                 .setProjectRoot(projectRoot)
                 .setApplicationRoot(rootBuilder.build())
@@ -339,7 +344,8 @@ public class AppMakerHelper {
         // TODO do we want any of these?
         Collection shutdownTasks = new HashSet();
         // TODO work out a good display name
-        PrepareResult result = createAugmentor(testClass, "(QuarkusTest)", curatedApplication, profile, shutdownTasks);
+        PrepareResult result = createAugmentor(testClass, "(QuarkusTest)", isContinuousTesting, curatedApplication, profile,
+                shutdownTasks);
         AugmentAction augmentAction = result.augmentAction;
         QuarkusTestProfile profileInstance = result.profileInstance;
 
