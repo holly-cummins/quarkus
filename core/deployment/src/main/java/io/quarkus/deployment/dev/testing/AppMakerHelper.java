@@ -68,8 +68,6 @@ public class AppMakerHelper {
     protected static final String TEST_PROFILE = "test-profile";
     /// end copied
 
-    private static boolean failedBoot;
-
     private static Class<?> quarkusTestMethodContextClass;
     private static boolean hasPerTestResources;
 

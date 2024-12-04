@@ -702,8 +702,7 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
             currentJUnitTestClass = extensionContext.getRequiredTestClass();
         }
         System.out.println("HOLLY about to check " + extensionContext.getRequiredTestClass() + " is new app");
-        boolean isNewApplication = isNewApplication(state, extensionContext.getRequiredTestClass()); // TODO diagnostic
-
+        boolean isNewApplication = isNewApplication(state, extensionContext.getRequiredTestClass());
         // TODO if classes are misordered, say because someone overrode the ordering, and there are profiles or resources,
         // we could try to start and application which has already been started, and fail with a mysterious error about
         // null shutdown contexts; we should try and detect that case, and give a friendlier error message
@@ -711,7 +710,9 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
         // TODO we could either keep track of applications we've already seen, or just detect the null shutdown context and explain a likely cause
         System.out.println("HOLLY " + extensionContext.getRequiredTestClass() + " is new app " + isNewApplication);
 
-        if ((state == null && !failedBoot) || isNewApplication) {
+        // We want to start if the profile changed (or there are new test resources),
+        // or if we don't have an app and that's not because the previous attempt to start it failed
+        if ((state == null && !failedBoot) || (runningQuarkusApplication != null && isNewApplication)) {
             if (isNewApplication) {
                 if (state != null) {
                     System.out.println("HOLLY closing old one");
@@ -733,7 +734,6 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
 
             } catch (Throwable e) {
                 System.out.println("OHH NOOO failed java start for " + extensionContext.getRequiredTestClass() + " e is " + e);
-                e.printStackTrace();
                 failedBoot = true;
                 markTestAsFailed(extensionContext, e);
                 firstException = e;
