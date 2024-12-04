@@ -128,6 +128,7 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
         boolean isQuarkusTest = false;
         // TODO we need to set this properly
         boolean isMainTest = false;
+        boolean isIntegrationTest = false;
         // TODO hack that didn't even work
         //        if (runtimeClassLoader != null && name.contains("QuarkusTestProfileAwareClass")) {
         //            return runtimeClassLoader.loadClass(name);
@@ -253,6 +254,11 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
                                 .getName()
                                 .endsWith("QuarkusMainTest"));
 
+                isIntegrationTest = Arrays.stream(fromCanary.getAnnotations())
+                        .anyMatch(annotation -> annotation.annotationType()
+                                .getName()
+                                .endsWith("QuarkusIntegrationTest"));
+
                 System.out.println("HOLLY canary gave " + fromCanary.getClassLoader());
 
                 Optional<Annotation> profileAnnotation = Arrays.stream(fromCanary.getAnnotations())
@@ -290,7 +296,7 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
             // Anything loaded by JUnit will come through this classloader
 
             System.out.println("HOLLY key 2 " + key);
-            if (isQuarkusTest || isMainTest) {
+            if ((isQuarkusTest && !isIntegrationTest) || isMainTest) {
                 System.out.println("HOLLY attempting to load " + name);
                 QuarkusClassLoader runtimeClassLoader = getQuarkusClassLoader(key, fromCanary, profile);
                 System.out.println("the rc parent is " + runtimeClassLoader.getParent());
