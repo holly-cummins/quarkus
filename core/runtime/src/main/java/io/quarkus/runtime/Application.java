@@ -245,13 +245,6 @@ public abstract class Application implements Closeable {
     }
 
     public static Application currentApplication() {
-        if (currentApplication != null) {
-            System.out.println("HOLLY sharing current application and auxiliar is " + currentApplication.auxiliaryApplication);
-        } else {
-            System.out.println("HOLLY sharing current application but it is null ");
-
-        }
-
         return currentApplication;
     }
 
