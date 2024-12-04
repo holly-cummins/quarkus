@@ -156,9 +156,8 @@ public class MainClassBuildStep {
         scField.setModifiers(Modifier.PUBLIC | Modifier.STATIC);
 
         MethodCreator ctor = file.getMethodCreator("<init>", void.class);
-        ResultHandle load = ctor.load(launchMode.isAuxiliaryApplication());
         ctor.invokeSpecialMethod(ofMethod(Application.class, "<init>", void.class, boolean.class),
-                ctor.getThis(), load);
+                ctor.getThis(), ctor.load(launchMode.isAuxiliaryApplication()));
         ctor.returnValue(null);
 
         MethodCreator mv = file.getMethodCreator("<clinit>", void.class);
