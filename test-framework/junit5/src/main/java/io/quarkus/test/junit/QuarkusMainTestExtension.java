@@ -71,16 +71,7 @@ public class QuarkusMainTestExtension extends AbstractJvmQuarkusTestExtension
         // we reload the test resources if we changed test class and if we had or will have per-test test resources
         boolean reloadTestResources = !Objects.equals(extensionContext.getRequiredTestClass(), currentJUnitTestClass)
                 && (hasPerTestResources || hasPerTestResources(extensionContext));
-
-        boolean isNewApplication = isNewApplication(state, currentJUnitTestClass);
-
-        if (reloadTestResources && !isNewApplication) {
-            throw new RuntimeException(
-                    "never going to work, has per test resources" + profile + currentJUnitTestClass + "\n for the ext content "
-                            + hasPerTestResources(extensionContext) + " \n static var " + hasPerTestResources);
-        }
-
-        if (isNewApplication) {
+        if (wrongProfile || reloadTestResources) {
             if (state != null) {
                 try {
                     state.close();
@@ -100,7 +91,6 @@ public class QuarkusMainTestExtension extends AbstractJvmQuarkusTestExtension
     private LaunchResult doLaunch(ExtensionContext context, Class<? extends QuarkusTestProfile> selectedProfile,
             String[] arguments) throws Exception {
         ensurePrepared(context, selectedProfile);
-        System.out.println("HOLLY doing launch " + context.getDisplayName() + Arrays.toString(arguments));
         LogCapturingOutputFilter filter = new LogCapturingOutputFilter(prepareResult.curatedApplication, false, false,
                 () -> true);
         QuarkusConsole.addOutputFilter(filter);
@@ -186,21 +176,13 @@ public class QuarkusMainTestExtension extends AbstractJvmQuarkusTestExtension
         }
     }
 
-    // TODO we could definitely still pull out more common code between this and quarkustestextension
     private int doJavaStart(ExtensionContext context, Class<? extends QuarkusTestProfile> profile, String[] arguments)
             throws Exception {
-        System.out.println("HOLLY doing Java start " + context.getDisplayName() + context.getRequiredTestClass()
-                + context.getRequiredTestMethod());
         JBossVersion.disableVersionLogging();
-        Class<?> requiredTestClass = context.getRequiredTestClass();
 
         TracingHandler.quarkusStarting();
         Closeable testResourceManager = null;
         try {
-
-            // We need to start each test method in its own classloader because of the @Launch annotations which keep starting applications
-            // Note that this is very different from how QuarkusTestExtension now behaves
-            // TODO is there more work needed to make this deviation from the pattern in QuarkusTestExtension work? Or more stuff to take out of QuarkusTestExtension?
             StartupAction startupAction = prepareResult.augmentAction.createInitialRuntimeApplication();
             Thread.currentThread().setContextClassLoader(startupAction.getClassLoader());
             QuarkusConsole.installRedirects();
