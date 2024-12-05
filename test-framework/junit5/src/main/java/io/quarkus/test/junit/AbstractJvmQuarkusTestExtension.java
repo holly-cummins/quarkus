@@ -94,13 +94,14 @@ public class AbstractJvmQuarkusTestExtension extends AbstractQuarkusTestWithCont
                 curatedApplication, testClassLocation);
     }
 
-    // TODO duplicated with AppMakerHelper, can we consolidate?
     protected static QuarkusTestProfile getQuarkusTestProfile(Class<? extends QuarkusTestProfile> profile,
             Collection<Runnable> shutdownTasks, Map<String, String> additional)
             throws InstantiationException, IllegalAccessException, InvocationTargetException, NoSuchMethodException {
         QuarkusTestProfile profileInstance = null;
         if (profile != null) {
             profileInstance = profile.getConstructor().newInstance();
+            // TODO the stuff below here is unique to this class
+            System.out.println("HOLLY extension stuff to additional " + additional);
             additional.putAll(profileInstance.getConfigOverrides());
             if (!profileInstance.getEnabledAlternatives().isEmpty()) {
                 additional.put("quarkus.arc.selected-alternatives", profileInstance.getEnabledAlternatives().stream()
