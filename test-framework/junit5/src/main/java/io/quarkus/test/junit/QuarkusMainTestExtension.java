@@ -1,14 +1,32 @@
 package io.quarkus.test.junit;
 
+import static io.quarkus.commons.classloading.ClassloadHelper.fromClassNameToResourceName;
+import static io.quarkus.test.common.PathTestHelper.getAppClassLocationForTestLocation;
+import static io.quarkus.test.common.PathTestHelper.getTestClassesLocation;
 import static io.quarkus.test.junit.IntegrationTestUtil.activateLogging;
 import static io.quarkus.test.junit.IntegrationTestUtil.getAdditionalTestResources;
 
 import java.io.Closeable;
 import java.lang.reflect.Method;
-import java.util.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.LinkedBlockingDeque;
+import java.util.function.Consumer;
 import java.util.logging.Handler;
+import java.util.stream.Collectors;
 
+import jakarta.enterprise.inject.Alternative;
+
+import org.jboss.jandex.Index;
 import org.jboss.logmanager.LogContext;
 import org.jboss.logmanager.handlers.OutputStreamHandler;
 import org.junit.jupiter.api.Assertions;
@@ -23,13 +41,27 @@ import org.junit.jupiter.api.extension.ParameterResolutionException;
 import org.junit.jupiter.api.extension.ParameterResolver;
 import org.junit.jupiter.api.extension.ReflectiveInvocationContext;
 
+import io.quarkus.bootstrap.BootstrapConstants;
+import io.quarkus.bootstrap.app.CuratedApplication;
+import io.quarkus.bootstrap.app.QuarkusBootstrap;
 import io.quarkus.bootstrap.app.StartupAction;
 import io.quarkus.bootstrap.logging.InitialConfigurator;
 import io.quarkus.bootstrap.logging.QuarkusDelayedHandler;
+import io.quarkus.bootstrap.model.ApplicationModel;
+import io.quarkus.bootstrap.runner.Timing;
+import io.quarkus.bootstrap.workspace.ArtifactSources;
+import io.quarkus.bootstrap.workspace.SourceDir;
+import io.quarkus.bootstrap.workspace.WorkspaceModule;
+import io.quarkus.deployment.dev.testing.CurrentTestApplication;
 import io.quarkus.deployment.dev.testing.LogCapturingOutputFilter;
 import io.quarkus.dev.console.QuarkusConsole;
 import io.quarkus.dev.testing.TracingHandler;
+import io.quarkus.paths.PathList;
+import io.quarkus.runtime.LaunchMode;
 import io.quarkus.runtime.logging.JBossVersion;
+import io.quarkus.test.common.PathTestHelper;
+import io.quarkus.test.common.RestorableSystemProperties;
+import io.quarkus.test.common.TestClassIndexer;
 import io.quarkus.test.common.TestResourceManager;
 import io.quarkus.test.junit.main.Launch;
 import io.quarkus.test.junit.main.LaunchResult;
@@ -323,5 +355,164 @@ public class QuarkusMainTestExtension extends AbstractJvmQuarkusTestExtension
     @Override
     public void beforeAll(ExtensionContext context) throws Exception {
         currentTestClassStack.push(context.getRequiredTestClass());
+    }
+
+    // TODO this is cloned from the pre-rewrite AbstractJvmQuarkusTestExtension to do things the old way, but code can probably be consolidated
+    @Override
+    protected PrepareResult createAugmentor(ExtensionContext context, Class<? extends QuarkusTestProfile> profile,
+            Collection<Runnable> shutdownTasks) throws Exception {
+
+        final PathList.Builder rootBuilder = PathList.builder();
+        Consumer<Path> addToBuilderIfConditionMet = path -> {
+            if (path != null && Files.exists(path) && !rootBuilder.contains(path)) {
+                rootBuilder.add(path);
+            }
+        };
+
+        final Class<?> requiredTestClass = context.getRequiredTestClass();
+        currentJUnitTestClass = requiredTestClass;
+
+        final Path testClassLocation;
+        final Path appClassLocation;
+        final Path projectRoot = Paths.get("").normalize().toAbsolutePath();
+
+        final ApplicationModel gradleAppModel = getGradleAppModelForIDE(projectRoot);
+        // If gradle project running directly with IDE
+        if (gradleAppModel != null && gradleAppModel.getApplicationModule() != null) {
+            final WorkspaceModule module = gradleAppModel.getApplicationModule();
+            final String testClassFileName = fromClassNameToResourceName(requiredTestClass.getName());
+            Path testClassesDir = null;
+            for (String classifier : module.getSourceClassifiers()) {
+                final ArtifactSources sources = module.getSources(classifier);
+                if (sources.isOutputAvailable() && sources.getOutputTree().contains(testClassFileName)) {
+                    for (SourceDir src : sources.getSourceDirs()) {
+                        addToBuilderIfConditionMet.accept(src.getOutputDir());
+                        if (Files.exists(src.getOutputDir().resolve(testClassFileName))) {
+                            testClassesDir = src.getOutputDir();
+                        }
+                    }
+                    for (SourceDir src : sources.getResourceDirs()) {
+                        addToBuilderIfConditionMet.accept(src.getOutputDir());
+                    }
+                    for (SourceDir src : module.getMainSources().getSourceDirs()) {
+                        addToBuilderIfConditionMet.accept(src.getOutputDir());
+                    }
+                    for (SourceDir src : module.getMainSources().getResourceDirs()) {
+                        addToBuilderIfConditionMet.accept(src.getOutputDir());
+                    }
+                    break;
+                }
+            }
+            if (testClassesDir == null) {
+                final StringBuilder sb = new StringBuilder();
+                sb.append("Failed to locate ").append(requiredTestClass.getName()).append(" in ");
+                for (String classifier : module.getSourceClassifiers()) {
+                    final ArtifactSources sources = module.getSources(classifier);
+                    if (sources.isOutputAvailable()) {
+                        for (SourceDir d : sources.getSourceDirs()) {
+                            if (Files.exists(d.getOutputDir())) {
+                                sb.append(System.lineSeparator()).append(d.getOutputDir());
+                            }
+                        }
+                    }
+                }
+                throw new RuntimeException(sb.toString());
+            }
+            testClassLocation = testClassesDir;
+
+        } else {
+            if (System.getProperty(BootstrapConstants.OUTPUT_SOURCES_DIR) != null) {
+                final String[] sourceDirectories = System.getProperty(BootstrapConstants.OUTPUT_SOURCES_DIR).split(",");
+                for (String sourceDirectory : sourceDirectories) {
+                    final Path directory = Paths.get(sourceDirectory);
+                    addToBuilderIfConditionMet.accept(directory);
+                }
+            }
+
+            testClassLocation = getTestClassesLocation(requiredTestClass);
+            appClassLocation = getAppClassLocationForTestLocation(testClassLocation.toString());
+            if (!appClassLocation.equals(testClassLocation)) {
+                addToBuilderIfConditionMet.accept(testClassLocation);
+                // if test classes is a dir, we should also check whether test resources dir exists as a separate dir (gradle)
+                // TODO: this whole app/test path resolution logic is pretty dumb, it needs be re-worked using proper workspace discovery
+                final Path testResourcesLocation = PathTestHelper.getResourcesForClassesDirOrNull(testClassLocation, "test");
+                addToBuilderIfConditionMet.accept(testResourcesLocation);
+            }
+
+            addToBuilderIfConditionMet.accept(appClassLocation);
+            final Path appResourcesLocation = PathTestHelper.getResourcesForClassesDirOrNull(appClassLocation, "main");
+            addToBuilderIfConditionMet.accept(appResourcesLocation);
+        }
+
+        originalCl = Thread.currentThread().getContextClassLoader();
+
+        // clear the test.url system property as the value leaks into the run when using different profiles
+        System.clearProperty("test.url");
+        Map<String, String> additional = new HashMap<>();
+
+        QuarkusTestProfile profileInstance = null;
+        if (profile != null) {
+            profileInstance = profile.getConstructor().newInstance();
+            additional.putAll(profileInstance.getConfigOverrides());
+            if (!profileInstance.getEnabledAlternatives().isEmpty()) {
+                additional.put("quarkus.arc.selected-alternatives", profileInstance.getEnabledAlternatives().stream()
+                        .peek((c) -> {
+                            if (!c.isAnnotationPresent(Alternative.class)) {
+                                throw new RuntimeException(
+                                        "Enabled alternative " + c + " is not annotated with @Alternative");
+                            }
+                        })
+                        .map(Class::getName).collect(Collectors.joining(",")));
+            }
+            if (profileInstance.disableApplicationLifecycleObservers()) {
+                additional.put("quarkus.arc.test.disable-application-lifecycle-observers", "true");
+            }
+            if (profileInstance.getConfigProfile() != null) {
+                additional.put(LaunchMode.TEST.getProfileKey(), profileInstance.getConfigProfile());
+            }
+            //we just use system properties for now
+            //it's a lot simpler
+            shutdownTasks.add(RestorableSystemProperties.setProperties(additional)::close);
+        }
+
+        CuratedApplication curatedApplication;
+        if (CurrentTestApplication.curatedApplication != null) {
+            curatedApplication = CurrentTestApplication.curatedApplication;
+        } else {
+            curatedApplication = QuarkusBootstrap.builder()
+                    //.setExistingModel(gradleAppModel) unfortunately this model is not re-usable due to PathTree serialization by Gradle
+                    .setBaseName(context.getDisplayName() + " (QuarkusTest)")
+                    .setIsolateDeployment(true)
+                    .setMode(QuarkusBootstrap.Mode.TEST)
+                    .setTest(true)
+                    .setTargetDirectory(PathTestHelper.getProjectBuildDir(projectRoot, testClassLocation))
+                    .setProjectRoot(projectRoot)
+                    .setApplicationRoot(rootBuilder.build())
+                    .build()
+                    .bootstrap();
+            shutdownTasks.add(curatedApplication::close);
+        }
+
+        if (curatedApplication.getApplicationModel().getRuntimeDependencies().isEmpty()) {
+            throw new RuntimeException(
+                    "The tests were run against a directory that does not contain a Quarkus project. Please ensure that the test is configured to use the proper working directory.");
+        }
+
+        Index testClassesIndex = TestClassIndexer.indexTestClasses(testClassLocation);
+        // we need to write the Index to make it reusable from other parts of the testing infrastructure that run in different ClassLoaders
+        TestClassIndexer.writeIndex(testClassesIndex, testClassLocation, requiredTestClass);
+
+        Timing.staticInitStarted(curatedApplication.getOrCreateBaseRuntimeClassLoader(),
+                curatedApplication.getQuarkusBootstrap().isAuxiliaryApplication());
+        final Map<String, Object> props = new HashMap<>();
+        props.put(TEST_LOCATION, testClassLocation);
+        props.put(TEST_CLASS, requiredTestClass);
+        if (profile != null) {
+            props.put(TEST_PROFILE, profile.getName());
+        }
+        quarkusTestProfile = profile;
+        return new PrepareResult(curatedApplication
+                .createAugmentor(QuarkusTestExtension.TestBuildChainFunction.class.getName(), props), profileInstance,
+                curatedApplication, testClassLocation);
     }
 }

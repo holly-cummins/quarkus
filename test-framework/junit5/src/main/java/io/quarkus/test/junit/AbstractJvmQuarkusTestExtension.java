@@ -215,7 +215,7 @@ public class AbstractJvmQuarkusTestExtension extends AbstractQuarkusTestWithCont
                 curatedApplication, testClassLocation);
     }
 
-    private ApplicationModel getGradleAppModelForIDE(Path projectRoot) throws IOException, AppModelResolverException {
+    protected ApplicationModel getGradleAppModelForIDE(Path projectRoot) throws IOException, AppModelResolverException {
         return System.getProperty(BootstrapConstants.SERIALIZED_TEST_APP_MODEL) == null
                 ? BuildToolHelper.enableGradleAppModelForTest(projectRoot)
                 : null;
