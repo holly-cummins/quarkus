@@ -17,6 +17,9 @@ import java.util.ServiceLoader;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
+
+import jakarta.enterprise.inject.Alternative;
 
 import org.jboss.jandex.AnnotationInstance;
 import org.jboss.jandex.AnnotationTarget;
@@ -51,7 +54,9 @@ import io.quarkus.deployment.builditem.TestClassBeanBuildItem;
 import io.quarkus.deployment.builditem.TestClassPredicateBuildItem;
 import io.quarkus.deployment.builditem.TestProfileBuildItem;
 import io.quarkus.paths.PathList;
+import io.quarkus.runtime.LaunchMode;
 import io.quarkus.test.common.PathTestHelper;
+import io.quarkus.test.common.RestorableSystemProperties;
 import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.buildchain.TestBuildChainCustomizerProducer;
 
@@ -67,6 +72,7 @@ public class AppMakerHelper {
     private static boolean hasPerTestResources;
 
     private static List<Object> testMethodInvokers;
+    private Runnable configCleanup;
 
     protected static class PrepareResult {
         protected final AugmentAction augmentAction;
@@ -123,9 +129,35 @@ public class AppMakerHelper {
 
         QuarkusTestProfile profileInstance = null;
         if (profile != null) {
-            profileInstance = profile.getConstructor().newInstance();
+            profileInstance = profile.getConstructor()
+                    .newInstance();
             // TODO we make this twice, also in abstractjvmextension can we streamline that?
-            // Do not do anything with the properties of the profile because we don't want to set system properties until the test is actually being run
+            // TODO We can't get rid of the one here because config needs to be set before augmentation, but maybe we can get rid of it on the test side?
+            additional.putAll(profileInstance.getConfigOverrides());
+            if (!profileInstance.getEnabledAlternatives()
+                    .isEmpty()) {
+                additional.put("quarkus.arc.selected-alternatives", profileInstance.getEnabledAlternatives()
+                        .stream()
+                        .peek((c) -> {
+                            if (!c.isAnnotationPresent(Alternative.class)) {
+                                throw new RuntimeException(
+                                        "Enabled alternative " + c + " is not annotated with @Alternative");
+                            }
+                        })
+                        .map(Class::getName)
+                        .collect(Collectors.joining(",")));
+            }
+            if (profileInstance.disableApplicationLifecycleObservers()) {
+                additional.put("quarkus.arc.test.disable-application-lifecycle-observers", "true");
+            }
+            if (profileInstance.getConfigProfile() != null) {
+                additional.put(LaunchMode.TEST.getProfileKey(), profileInstance.getConfigProfile());
+            }
+            //we just use system properties for now
+            //it's a lot simpler
+            // TODO this is really ugly, set proper config on the app
+            // Sadly, I don't think #42715 helps, because it kicks in after this code
+            configCleanup = RestorableSystemProperties.setProperties(additional)::close;
         }
 
         if (curatedApplication
@@ -143,7 +175,8 @@ public class AppMakerHelper {
         Timing.staticInitStarted(curatedApplication
                 .getOrCreateBaseRuntimeClassLoader(),
                 curatedApplication
-                        .getQuarkusBootstrap().isAuxiliaryApplication());
+                        .getQuarkusBootstrap()
+                        .isAuxiliaryApplication());
         final Map<String, Object> props = new HashMap<>();
         props.put(TEST_LOCATION, testClassLocation);
         props.put(TEST_CLASS, requiredTestClass);
@@ -335,6 +368,10 @@ public class AppMakerHelper {
             // TODO this seems to be safe to do because the classloaders are the same
             // TODO not doing it startupAction.store();
             System.out.println("HOLLY did store " + startupAction);
+
+            // TODO this is ugly, there must be a better way?
+            // TODO tests to run to check changes here are integration-tests/elytron-resteasy-reactive and SharedProfileTestCase in integration-tests/main
+
             return new DumbHolder(startupAction, result);
         } catch (RuntimeException e) {
             // Errors at this point just get reported as org.junit.platform.commons.JUnitException: TestEngine with ID 'junit-jupiter' failed to discover tests
@@ -343,6 +380,10 @@ public class AppMakerHelper {
             e.printStackTrace();
             throw e;
 
+        } finally {
+            if (configCleanup != null) {
+                configCleanup.run();
+            }
         }
 
     }
