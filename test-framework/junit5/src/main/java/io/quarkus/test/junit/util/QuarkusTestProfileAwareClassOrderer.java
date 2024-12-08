@@ -81,33 +81,26 @@ public class QuarkusTestProfileAwareClassOrderer implements ClassOrderer {
 
         // In many cases (like QuarkusTest), the heavy lifting of understanding profiles and resources has been done elsewhere; we just need to group tests by classloader
         // However, for integration tests and main tests, profiles will not have been read
-        if (context.getClassDescriptors()
+        long classloaderCount = context.getClassDescriptors()
                 .stream()
                 .map(d -> d.getTestClass()
                         .getClassLoader())
                 .distinct()
-                .count() > 1) {
+                .count();
+        if (classloaderCount > 1) {
 
-            buildSecondaryOrderer(context).orderClasses(context);
+            // If we sort first before applying the classloader sorting, the original order will be preserved within classloader groups
+            ClassOrderer secondary = buildSecondaryOrderer(context);
+            secondary.orderClasses(context);
 
-            context.getClassDescriptors().sort(classLoaderComparator.thenComparing(classNameComparator));
+            context.getClassDescriptors().sort(Comparator.<ClassDescriptor, String> comparing(o -> o.getTestClass()
+                    .getClassLoader()
+                    .getName()));
 
         } else {
             orderByProfiles(context);
         }
     }
-
-    private static final Comparator<ClassDescriptor> classLoaderComparator = (o1, o2) -> o1.getTestClass()
-            .getClassLoader()
-            .getName()
-            .compareTo(o2.getTestClass()
-                    .getClassLoader()
-                    .getName());
-
-    private static final Comparator<ClassDescriptor> classNameComparator = (o1, o2) -> o1.getTestClass()
-            .getName()
-            .compareTo(o2.getTestClass()
-                    .getName());
 
     private void orderByProfiles(ClassOrdererContext context) {
 

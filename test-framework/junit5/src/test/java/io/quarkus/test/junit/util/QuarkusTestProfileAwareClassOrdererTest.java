@@ -19,7 +19,6 @@ import java.util.Optional;
 import org.junit.jupiter.api.ClassDescriptor;
 import org.junit.jupiter.api.ClassOrderer;
 import org.junit.jupiter.api.ClassOrdererContext;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -90,26 +89,25 @@ class QuarkusTestProfileAwareClassOrdererTest {
                 quarkusTestb2Desc);
     }
 
-    @Disabled // TODO implement this
     @Test
     void multipleClassloadersAndSecondaryOrderer() throws IOException {
         ByteClassLoader a = new ByteClassLoader("a");
-        Class cla1 = a.cloneClass(Test08.class);
-        Class cla2 = a.cloneClass(Test09.class);
+        Class cla1 = a.cloneClass(Test07.class);
+        Class cla2 = a.cloneClass(Test08.class);
+        Class cla3 = a.cloneClass(Test09.class);
         ByteClassLoader b = new ByteClassLoader("b");
-        Class clb1 = b.cloneClass(Test07.class);
-        Class clb2 = b.cloneClass(Test10.class);
+        Class clb1 = b.cloneClass(Test10.class);
 
-        ClassDescriptor quarkusTesta1Desc = quarkusDescriptorMock(cla1, null);
-        ClassDescriptor quarkusTesta2Desc = quarkusDescriptorMock(cla2, null);
-        ClassDescriptor quarkusTestb1Desc = quarkusDescriptorMock(clb1, null);
-        ClassDescriptor quarkusTestb2Desc = quarkusDescriptorMock(clb2, null);
+        ClassDescriptor quarkusTesta1Desc = quarkusDescriptorMock(cla1, null, 4);
+        ClassDescriptor quarkusTesta2Desc = quarkusDescriptorMock(cla2, null, 6);
+        ClassDescriptor quarkusTesta3Desc = quarkusDescriptorMock(cla3, null, 2);
+        ClassDescriptor quarkusTestb1Desc = quarkusDescriptorMock(clb1, null, 1);
 
         List<ClassDescriptor> input = Arrays.asList(
-                quarkusTestb2Desc,
+                quarkusTesta3Desc,
                 quarkusTesta1Desc,
-                quarkusTestb1Desc,
-                quarkusTesta2Desc);
+                quarkusTesta2Desc,
+                quarkusTestb1Desc);
 
         doReturn(input).when(contextMock)
                 .getClassDescriptors();
@@ -121,9 +119,9 @@ class QuarkusTestProfileAwareClassOrdererTest {
         underTest.orderClasses(contextMock);
 
         assertThat(input).containsExactly(
-                quarkusTesta2Desc,
+                quarkusTesta3Desc,
                 quarkusTesta1Desc,
-                quarkusTestb2Desc,
+                quarkusTesta2Desc,
                 quarkusTestb1Desc);
     }
 
@@ -258,6 +256,11 @@ class QuarkusTestProfileAwareClassOrdererTest {
     }
 
     private ClassDescriptor quarkusDescriptorMock(Class<?> testClass, Class<? extends QuarkusTestProfile> profileClass) {
+        return quarkusDescriptorMock(testClass, profileClass, -1);
+    }
+
+    private ClassDescriptor quarkusDescriptorMock(Class<?> testClass, Class<? extends QuarkusTestProfile> profileClass,
+            int order) {
         ClassDescriptor mock = descriptorMock(testClass);
         when(mock.isAnnotated(QuarkusTest.class)).thenReturn(true);
         if (profileClass != null) {
@@ -265,6 +268,12 @@ class QuarkusTestProfileAwareClassOrdererTest {
             doReturn(profileClass).when(profileMock)
                     .value();
             when(mock.findAnnotation(TestProfile.class)).thenReturn(Optional.of(profileMock));
+        }
+        if (order > 0) {
+            Order orderMock = Mockito.mock(Order.class);
+            doReturn(order).when(orderMock).value();
+            when(mock.findAnnotation(Order.class)).thenReturn(Optional.of(orderMock));
+
         }
         return mock;
     }
