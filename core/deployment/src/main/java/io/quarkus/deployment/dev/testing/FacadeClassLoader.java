@@ -295,7 +295,7 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
             // Doing it just for the test loads too little, doing it for everything gives java.lang.ClassCircularityError: io/quarkus/runtime/configuration/QuarkusConfigFactory
             // Anything loaded by JUnit will come through this classloader
 
-            if ((isQuarkusTest && !isIntegrationTest) || isMainTest) {
+            if (isQuarkusTest && !isIntegrationTest && !isMainTest) {
                 System.out.println("HOLLY attempting to load " + name);
                 QuarkusClassLoader runtimeClassLoader = getQuarkusClassLoader(key, fromCanary, profile);
                 Class thing = runtimeClassLoader.loadClass(name);

@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.extension.ExtensionContext;
 
 import io.quarkus.bootstrap.BootstrapConstants;
+import io.quarkus.bootstrap.BootstrapException;
 import io.quarkus.bootstrap.app.AugmentAction;
 import io.quarkus.bootstrap.app.CuratedApplication;
 import io.quarkus.bootstrap.app.RunningQuarkusApplication;
@@ -59,8 +60,7 @@ public class AbstractJvmQuarkusTestExtension extends AbstractQuarkusTestWithCont
 
         System.out.println(
                 "HOLLY about to cast " + requiredTestClass.getName() + " which has cl " + requiredTestClass.getClassLoader());
-        CuratedApplication curatedApplication = ((QuarkusClassLoader) requiredTestClass.getClassLoader())
-                .getCuratedApplication();
+        CuratedApplication curatedApplication = getCuratedApplication(requiredTestClass, context, shutdownTasks);
         System.out.println("HOLLY " + requiredTestClass.getClassLoader() + " gives " + curatedApplication);
 
         // TODO need to handle the gradle case - can we put it in that method?
@@ -92,6 +92,14 @@ public class AbstractJvmQuarkusTestExtension extends AbstractQuarkusTestWithCont
         return new PrepareResult(curatedApplication
                 .createAugmentor(QuarkusTestExtension.TestBuildChainFunction.class.getName(), props), profileInstance,
                 curatedApplication, testClassLocation);
+    }
+
+    protected CuratedApplication getCuratedApplication(Class<?> requiredTestClass, ExtensionContext context,
+            Collection<Runnable> shutdownTasks) throws BootstrapException, AppModelResolverException, IOException {
+        // TODO make this abstract, push this implementation down to QuarkusTestExtension, since that is the only place it will work
+        CuratedApplication curatedApplication = ((QuarkusClassLoader) requiredTestClass.getClassLoader())
+                .getCuratedApplication();
+        return curatedApplication;
     }
 
     protected static QuarkusTestProfile getQuarkusTestProfile(Class<? extends QuarkusTestProfile> profile,
@@ -126,7 +134,7 @@ public class AbstractJvmQuarkusTestExtension extends AbstractQuarkusTestWithCont
         return profileInstance;
     }
 
-    private ApplicationModel getGradleAppModelForIDE(Path projectRoot) throws IOException, AppModelResolverException {
+    ApplicationModel getGradleAppModelForIDE(Path projectRoot) throws IOException, AppModelResolverException {
         return System.getProperty(BootstrapConstants.SERIALIZED_TEST_APP_MODEL) == null
                 ? BuildToolHelper.enableGradleAppModelForTest(projectRoot)
                 : null;
