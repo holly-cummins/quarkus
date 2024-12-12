@@ -26,11 +26,10 @@ import java.util.concurrent.ConcurrentMap;
 
 import org.jboss.logging.Logger;
 
-import io.quarkus.commons.classloading.ClassLoaderHelper;
-import io.quarkus.paths.ManifestAttributes;
-
 import io.quarkus.bootstrap.app.CuratedApplication;
 import io.quarkus.bootstrap.app.StartupAction;
+import io.quarkus.commons.classloading.ClassLoaderHelper;
+import io.quarkus.paths.ManifestAttributes;
 
 /**
  * The ClassLoader used for non production Quarkus applications (i.e. dev and test mode).
