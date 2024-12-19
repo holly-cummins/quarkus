@@ -21,7 +21,7 @@
         <!-- These properties are needed in order for them to be resolvable by the generated projects -->
         <compiler-plugin.version>${version.compiler.plugin}</compiler-plugin.version>
         <kotlin.version>2.0.21</kotlin.version>
-        <dokka.version>1.9.20</dokka.version>
+        <dokka.version>2.0.0</dokka.version>
         <scala.version>2.13.12</scala.version>
         <scala-maven-plugin.version>4.9.2</scala-maven-plugin.version>
         <!-- not pretty but this is used in the codestarts and we don't want to break compatibility -->
@@ -33,8 +33,8 @@
         <jandex-gradle-plugin.version>1.0.0</jandex-gradle-plugin.version>
 
         <asciidoctorj.version>2.5.13</asciidoctorj.version>
-        <htmlunit.version>4.5.0</htmlunit.version>
-        <javaparser-core.version>3.26.2</javaparser-core.version>
+        <htmlunit.version>4.7.0</htmlunit.version>
+        <javaparser-core.version>3.26.3</javaparser-core.version>
         <jdeparser.version>2.0.3.Final</jdeparser.version>
         <subethasmtp.version>6.0.1</subethasmtp.version>
 
@@ -101,11 +101,11 @@
         <keycloak.docker.image>quay.io/keycloak/keycloak:${keycloak.version}</keycloak.docker.image>
         <keycloak.docker.legacy.image>quay.io/keycloak/keycloak:${keycloak.wildfly.version}-legacy</keycloak.docker.legacy.image>
 
-        <unboundid-ldap.version>7.0.1</unboundid-ldap.version>
+        <unboundid-ldap.version>7.0.2</unboundid-ldap.version>
 
         <assertj.version>3.26.3</assertj.version>
 
-        <wiremock.version>3.9.2</wiremock.version>
+        <wiremock.version>3.10.0</wiremock.version>
         <wiremock-maven-plugin.version>7.3.0</wiremock-maven-plugin.version>
 
         <!-- Artemis test dependencies -->
@@ -116,7 +116,7 @@
 
         <asciidoctor-maven-plugin.version>2.0.0</asciidoctor-maven-plugin.version>
         <docker-maven-plugin.version>0.45.1</docker-maven-plugin.version>
-        <maven-invoker-plugin.version>3.8.1</maven-invoker-plugin.version>
+        <maven-invoker-plugin.version>3.9.0</maven-invoker-plugin.version>
 
         <!-- revapi API check -->
         <revapi-maven-plugin.version>0.14.7</revapi-maven-plugin.version>
@@ -659,6 +659,11 @@
                             </goals>
                         </execution>
                     </executions>
+                </plugin>
+                <plugin>
+                    <groupId>io.smallrye.certs</groupId>
+                    <artifactId>smallrye-certificate-generator-maven-plugin</artifactId>
+                    <version>${smallrye-certificate-generator.version}</version>
                 </plugin>
             </plugins>
         </pluginManagement>

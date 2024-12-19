@@ -15,9 +15,11 @@ import io.quarkus.runtime.annotations.ConfigDocMapKey;
 import io.quarkus.runtime.annotations.ConfigPhase;
 import io.quarkus.runtime.annotations.ConfigRoot;
 import io.quarkus.runtime.configuration.MemorySize;
+import io.quarkus.runtime.configuration.TrimmedStringConverter;
 import io.smallrye.config.ConfigMapping;
 import io.smallrye.config.ConfigValue;
 import io.smallrye.config.SmallRyeConfig;
+import io.smallrye.config.WithConverter;
 import io.smallrye.config.WithDefault;
 import io.smallrye.config.WithDefaults;
 import io.smallrye.config.WithKeys;
@@ -58,7 +60,7 @@ public interface RestClientsConfig {
      * <p>
      * Can be overwritten by client-specific settings.
      */
-    Optional<String> proxyAddress();
+    Optional<@WithConverter(TrimmedStringConverter.class) String> proxyAddress();
 
     /**
      * Proxy username, equivalent to the http.proxy or https.proxy JVM settings.
@@ -175,8 +177,7 @@ public interface RestClientsConfig {
     Optional<Boolean> followRedirects();
 
     /**
-     * Map where keys are fully-qualified provider classnames to include in the client, and values are their integer
-     * priorities. The equivalent of the `@RegisterProvider` annotation.
+     * Fully-qualified provider classnames to include in the client. The equivalent of the `@RegisterProvider` annotation.
      * <p>
      * Can be overwritten by client-specific settings.
      */
@@ -449,7 +450,7 @@ public interface RestClientsConfig {
          * <p>
          * Use `none` to disable proxy
          */
-        Optional<String> proxyAddress();
+        Optional<@WithConverter(TrimmedStringConverter.class) String> proxyAddress();
 
         /**
          * Proxy username.
@@ -592,8 +593,7 @@ public interface RestClientsConfig {
         Optional<Boolean> http2();
 
         /**
-         * The max HTTP ch
-         * unk size (8096 bytes by default).
+         * The max HTTP chunk size (8096 bytes by default).
          * <p>
          * This property is not applicable to the RESTEasy Client.
          */
@@ -613,6 +613,14 @@ public interface RestClientsConfig {
          * This stacktrace will be used if the invocation throws an exception
          */
         Optional<Boolean> captureStacktrace();
+
+        /**
+         * If set to {@code true}, then this REST Client will not the default exception mapper which
+         * always throws an exception if HTTP response code >= 400.
+         * This property is not applicable to the RESTEasy Client.
+         */
+        @WithDefault("${microprofile.rest.client.disable.default.mapper:false}")
+        Boolean disableDefaultMapper();
     }
 
     class RestClientKeysProvider implements Supplier<Iterable<String>> {

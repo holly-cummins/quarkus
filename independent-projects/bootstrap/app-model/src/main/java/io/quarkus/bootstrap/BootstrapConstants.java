@@ -10,6 +10,7 @@ public interface BootstrapConstants {
     String SERIALIZED_TEST_APP_MODEL = "quarkus-internal-test.serialized-app-model.path";
     String DESCRIPTOR_FILE_NAME = "quarkus-extension.properties";
     String CONDITIONAL_DEPENDENCIES = "conditional-dependencies";
+    String CONDITIONAL_DEV_DEPENDENCIES = "conditional-dev-dependencies";
     String DEPENDENCY_CONDITION = "dependency-condition";
 
     /**
@@ -17,6 +18,9 @@ public interface BootstrapConstants {
      * The Gradle plugin populates this data which is then read by the PathTestHelper when executing tests.
      */
     String TEST_TO_MAIN_MAPPINGS = "TEST_TO_MAIN_MAPPINGS";
+
+    // Added because OUTPUT_SOURCES_DIR does not include additional sources and we sometimes (always?) need them
+    String ALL_OUTPUT_SOURCES_DIR = "ALL_OUTPUT_SOURCES_DIR";
 
     String OUTPUT_SOURCES_DIR = "OUTPUT_SOURCES_DIR";
 

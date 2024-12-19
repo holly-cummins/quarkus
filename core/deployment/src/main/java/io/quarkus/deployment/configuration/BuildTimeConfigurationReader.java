@@ -21,6 +21,7 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -80,9 +81,11 @@ import io.smallrye.config.DefaultValuesConfigSource;
 import io.smallrye.config.EnvConfigSource;
 import io.smallrye.config.ProfileConfigSourceInterceptor;
 import io.smallrye.config.PropertiesConfigSource;
+import io.smallrye.config.PropertyName;
 import io.smallrye.config.SecretKeys;
 import io.smallrye.config.SmallRyeConfig;
 import io.smallrye.config.SmallRyeConfigBuilder;
+import io.smallrye.config.SmallRyeConfigBuilderCustomizer;
 import io.smallrye.config.SysPropConfigSource;
 import io.smallrye.config.common.AbstractConfigSource;
 
@@ -626,22 +629,19 @@ public final class BuildTimeConfigurationReader {
                 objectsByClass.put(mapping.getKlass(), config.getConfigMapping(mapping.getKlass(), mapping.getPrefix()));
             }
 
-            // Build Time Values Recording
-            for (ConfigClass mapping : buildTimeMappings) {
-                Set<String> mappedProperties = ConfigMappings.mappedProperties(mapping, allProperties);
-                for (String property : mappedProperties) {
+            Set<PropertyName> buildTimeNames = mappingsToNames(buildTimeMappings).keySet();
+            Set<PropertyName> buildTimeRunTimeNames = mappingsToNames(buildTimeRunTimeMappings).keySet();
+            Set<PropertyName> runTimeNames = mappingsToNames(runTimeMappings).keySet();
+            for (String property : allProperties) {
+                PropertyName name = new PropertyName(property);
+                if (buildTimeNames.contains(name)) {
                     unknownBuildProperties.remove(property);
                     ConfigValue value = config.getConfigValue(property);
                     if (value.getRawValue() != null) {
                         allBuildTimeValues.put(value.getNameProfiled(), value.getRawValue());
                     }
                 }
-            }
-
-            // Build Time and Run Time Values Recording
-            for (ConfigClass mapping : buildTimeRunTimeMappings) {
-                Set<String> mappedProperties = ConfigMappings.mappedProperties(mapping, allProperties);
-                for (String property : mappedProperties) {
+                if (buildTimeRunTimeNames.contains(name)) {
                     unknownBuildProperties.remove(property);
                     ConfigValue value = config.getConfigValue(property);
                     if (value.getRawValue() != null) {
@@ -649,12 +649,7 @@ public final class BuildTimeConfigurationReader {
                         buildTimeRunTimeValues.put(value.getNameProfiled(), value.getRawValue());
                     }
                 }
-            }
-
-            // Run Time Values Recording
-            for (ConfigClass mapping : runTimeMappings) {
-                Set<String> mappedProperties = ConfigMappings.mappedProperties(mapping, allProperties);
-                for (String property : mappedProperties) {
+                if (runTimeNames.contains(name)) {
                     unknownBuildProperties.remove(property);
                     ConfigValue value = runtimeConfig.getConfigValue(property);
                     if (value.getRawValue() != null) {
@@ -1119,6 +1114,17 @@ public final class BuildTimeConfigurationReader {
             builder.getProfiles().add("");
             builder.getSources().clear();
             builder.getSourceProviders().clear();
+            builder.withCustomizers(new SmallRyeConfigBuilderCustomizer() {
+                @Override
+                public void configBuilder(final SmallRyeConfigBuilder builder) {
+                    builder.getMappingsBuilder().getMappings().clear();
+                }
+
+                @Override
+                public int priority() {
+                    return Integer.MAX_VALUE;
+                }
+            });
             builder.setAddDefaultSources(false)
                     // Customizers may duplicate sources, but not much we can do about it, we need to run them
                     .addDiscoveredCustomizers()
@@ -1216,6 +1222,29 @@ public final class BuildTimeConfigurationReader {
                         patternMap.getChild(childName));
             }
         }
+
+        private static Map<PropertyName, String> mappingsToNames(final List<ConfigClass> configMappings) {
+            Set<String> names = new HashSet<>();
+            for (ConfigClass configMapping : configMappings) {
+                names.addAll(ConfigMappings.getProperties(configMapping).keySet());
+            }
+            Map<PropertyName, String> propertyNames = new HashMap<>();
+            for (String name : names) {
+                PropertyName propertyName = new PropertyName(name);
+                if (propertyNames.containsKey(propertyName)) {
+                    List<String> duplicates = new ArrayList<>();
+                    duplicates.add(name);
+                    while (propertyNames.containsKey(propertyName)) {
+                        duplicates.add(propertyNames.remove(propertyName));
+                    }
+                    String minName = Collections.min(duplicates, Comparator.comparingInt(String::length));
+                    propertyNames.put(new PropertyName(minName), minName);
+                } else {
+                    propertyNames.put(propertyName, name);
+                }
+            }
+            return propertyNames;
+        }
     }
 
     public static final class ReadResult {
@@ -1236,7 +1265,9 @@ public final class BuildTimeConfigurationReader {
         final List<ConfigClass> buildTimeMappings;
         final List<ConfigClass> buildTimeRunTimeMappings;
         final List<ConfigClass> runTimeMappings;
-        final Map<Class<?>, ConfigClass> allMappings;
+        final List<ConfigClass> allMappings;
+        final Map<Class<?>, ConfigClass> allMappingsByClass;
+        final Map<PropertyName, String> allMappingsNames;
 
         final Set<String> unknownBuildProperties;
         final Set<String> deprecatedRuntimeProperties;
@@ -1260,7 +1291,9 @@ public final class BuildTimeConfigurationReader {
             this.buildTimeMappings = builder.getBuildTimeMappings();
             this.buildTimeRunTimeMappings = builder.getBuildTimeRunTimeMappings();
             this.runTimeMappings = builder.getRunTimeMappings();
-            this.allMappings = mappingsToMap(builder);
+            this.allMappings = new ArrayList<>(mappingsToMap(builder).values());
+            this.allMappingsByClass = mappingsToMap(builder);
+            this.allMappingsNames = ReadOperation.mappingsToNames(allMappings);
 
             this.unknownBuildProperties = builder.getUnknownBuildProperties();
             this.deprecatedRuntimeProperties = builder.deprecatedRuntimeProperties;
@@ -1342,8 +1375,16 @@ public final class BuildTimeConfigurationReader {
             return runTimeMappings;
         }
 
-        public Map<Class<?>, ConfigClass> getAllMappings() {
+        public List<ConfigClass> getAllMappings() {
             return allMappings;
+        }
+
+        public Map<Class<?>, ConfigClass> getAllMappingsByClass() {
+            return allMappingsByClass;
+        }
+
+        public Map<PropertyName, String> getAllMappingsNames() {
+            return allMappingsNames;
         }
 
         public Set<String> getUnknownBuildProperties() {

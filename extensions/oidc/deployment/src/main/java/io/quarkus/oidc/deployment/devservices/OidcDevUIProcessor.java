@@ -6,7 +6,7 @@ import java.util.Set;
 import org.eclipse.microprofile.config.ConfigProvider;
 import org.jboss.logging.Logger;
 
-import io.quarkus.arc.deployment.SyntheticBeanBuildItem;
+import io.quarkus.arc.deployment.BeanContainerBuildItem;
 import io.quarkus.deployment.Capabilities;
 import io.quarkus.deployment.IsDevelopment;
 import io.quarkus.deployment.annotations.BuildProducer;
@@ -30,6 +30,7 @@ import io.quarkus.oidc.runtime.devui.OidcDevUiRecorder;
 import io.quarkus.oidc.runtime.providers.KnownOidcProviders;
 import io.quarkus.runtime.configuration.ConfigUtils;
 import io.quarkus.vertx.http.deployment.NonApplicationRootPathBuildItem;
+import io.quarkus.vertx.http.runtime.HttpConfiguration;
 import io.vertx.core.Vertx;
 import io.vertx.core.http.HttpHeaders;
 import io.vertx.core.json.JsonObject;
@@ -51,7 +52,7 @@ public class OidcDevUIProcessor extends AbstractDevUIProcessor {
     // Well-known providers
 
     private static final String KEYCLOAK = "Keycloak";
-    private static final String AZURE = "Azure";
+    private static final String ENTRAID = "Microsoft Entra ID";
     private static final Set<String> OTHER_PROVIDERS = Set.of("Auth0", "Okta", "Google", "Github", "Spotify");
 
     OidcBuildTimeConfig oidcConfig;
@@ -61,7 +62,8 @@ public class OidcDevUIProcessor extends AbstractDevUIProcessor {
     @Consume(RuntimeConfigSetupCompleteBuildItem.class)
     void prepareOidcDevConsole(CuratedApplicationShutdownBuildItem closeBuildItem,
             Capabilities capabilities,
-            BuildProducer<SyntheticBeanBuildItem> syntheticBeanBuildItemBuildProducer,
+            HttpConfiguration httpConfiguration,
+            BeanContainerBuildItem beanContainer,
             NonApplicationRootPathBuildItem nonApplicationRootPathBuildItem,
             BuildProducer<CardPageBuildItem> cardPageProducer,
             ConfigurationBuildItem configurationBuildItem,
@@ -72,7 +74,6 @@ public class OidcDevUIProcessor extends AbstractDevUIProcessor {
         final OidcTenantConfig providerConfig = getProviderConfig();
         final String authServerUrl = getAuthServerUrl(providerConfig);
         if (authServerUrl != null) {
-
             if (vertxInstance == null) {
                 vertxInstance = Vertx.vertx();
 
@@ -91,7 +92,6 @@ public class OidcDevUIProcessor extends AbstractDevUIProcessor {
                 };
                 closeBuildItem.addCloseTask(closeTask, true);
             }
-
             JsonObject metadata = null;
             if (isDiscoveryEnabled(providerConfig)) {
                 metadata = discoverMetadata(authServerUrl);
@@ -120,7 +120,7 @@ public class OidcDevUIProcessor extends AbstractDevUIProcessor {
                     metadataNotNull
                             ? (metadata.containsKey("introspection_endpoint") || metadata.containsKey("userinfo_endpoint"))
                             : checkProviderUserInfoRequired(providerConfig),
-                    syntheticBeanBuildItemBuildProducer,
+                    beanContainer,
                     oidcConfig.devui().webClientTimeout(),
                     oidcConfig.devui().grantOptions(),
                     nonApplicationRootPathBuildItem,
@@ -128,7 +128,8 @@ public class OidcDevUIProcessor extends AbstractDevUIProcessor {
                     keycloakAdminUrl,
                     null,
                     null,
-                    true);
+                    true,
+                    httpConfiguration);
             cardPageProducer.produce(cardPage);
         }
     }
@@ -150,7 +151,7 @@ public class OidcDevUIProcessor extends AbstractDevUIProcessor {
             return KEYCLOAK;
         }
         if (authServerUrl.contains("microsoft")) {
-            return AZURE;
+            return ENTRAID;
         }
         for (String provider : OTHER_PROVIDERS) {
             if (authServerUrl.contains(provider.toLowerCase())) {

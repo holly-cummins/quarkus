@@ -279,8 +279,12 @@ public class VertxHttpRecorder {
             ManagementInterfaceConfiguration managementConfig = new ManagementInterfaceConfiguration();
             ConfigInstantiator.handleObject(managementConfig);
             if (httpConfiguration.host == null) {
-                //HttpHostConfigSource does not come into play here
+                //VertxConfigBuilder does not come into play here
                 httpConfiguration.host = "localhost";
+            }
+            if (managementConfig.host == null) {
+                //VertxConfigBuilder does not come into play here
+                managementConfig.host = "localhost";
             }
             Router router = Router.router(vertx);
             if (hotReplacementHandler != null) {
@@ -292,7 +296,7 @@ public class VertxHttpRecorder {
             if (liveReloadConfig.password().isPresent()
                     && hotReplacementContext.getDevModeType() == DevModeType.REMOTE_SERVER_SIDE) {
                 root = remoteSyncHandler = new RemoteSyncHandler(liveReloadConfig.password().get(), root,
-                        hotReplacementContext);
+                        hotReplacementContext, "/");
             }
             rootHandler = root;
 
@@ -475,7 +479,7 @@ public class VertxHttpRecorder {
 
         boolean quarkusWrapperNeeded = false;
 
-        if (shutdownConfig.isShutdownTimeoutSet()) {
+        if (shutdownConfig.isTimeoutEnabled()) {
             gracefulShutdownFilter.next(root);
             root = gracefulShutdownFilter;
             quarkusWrapperNeeded = true;
@@ -543,7 +547,8 @@ public class VertxHttpRecorder {
         }
         if (launchMode == LaunchMode.DEVELOPMENT && liveReloadConfig.password().isPresent()
                 && hotReplacementContext.getDevModeType() == DevModeType.REMOTE_SERVER_SIDE) {
-            root = remoteSyncHandler = new RemoteSyncHandler(liveReloadConfig.password().get(), root, hotReplacementContext);
+            root = remoteSyncHandler = new RemoteSyncHandler(liveReloadConfig.password().get(), root, hotReplacementContext,
+                    rootPath);
         }
         rootHandler = root;
 
