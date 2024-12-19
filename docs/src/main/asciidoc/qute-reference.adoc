@@ -457,7 +457,8 @@ First two elements: {#each myArray.take(2)}{it}{/each} <5>
 
 ==== Character Escapes
 
-For HTML and XML templates the `'`, `"`, `<`, `>`, `&` characters are escaped by default if a template variant is set.
+For HTML and XML templates the `'`, `"`, `<`, `>`, `&` characters are escaped by default if a corresponding template variant is set.
+For JSON templates the `"`, `\` and the control characters (`U+0000` through `U+001F`) are escaped by default if a corresponding template variant is set.
 
 NOTE: In Quarkus, a variant is set automatically for templates located in the `src/main/resources/templates`. By default, the `java.net.URLConnection#getFileNameMap()` is used to determine the content-type of a template file. The additional map of suffixes to content types can be set via `quarkus.qute.content-types`.
 
@@ -466,6 +467,7 @@ If you need to render the unescaped value:
 1. Either use the `raw` or `safe` properties implemented as extension methods of the `java.lang.Object`,
 2. Or wrap the `String` value in a `io.quarkus.qute.RawString`.
 
+.HTML Example
 [source,html]
 ----
 <html>
@@ -477,6 +479,17 @@ If you need to render the unescaped value:
 <2> `paragraph` that resolves to `<p>My text!</p>` will be rendered as `<p>My text!</p>`
 
 TIP: By default, a template with one of the following content types is escaped: `text/html`, `text/xml`, `application/xml` and `application/xhtml+xml`. However, it's possible to extend this list via the `quarkus.qute.escape-content-types` configuration property.
+
+.JSON Example
+[source,json]
+----
+{
+  "id": "{valueId.raw}", <1>
+  "name": "{valueName}" <2>
+}
+----
+<1> `valueId` that resolves to `\nA12345` will be rendered as `\nA12345` that will result in an invalid JSON Object because of the new line inserted inside the string value for the attribute `id`.
+<2> `valueName` that resolves to `\tExpressions \n Escapes` will be rendered as `\\tExpressions \\n Escapes`.
 
 [[virtual_methods]]
 ==== Virtual Methods
@@ -774,11 +787,11 @@ A loop section may also define the `{#else}` block that is executed when there a
 [[if_section]]
 ==== If Section
 
-The `if` section represents a basic control flow section.
+The `{#if}` section represents a basic control flow section.
 The simplest possible version accepts a single parameter and renders the content if the condition is evaluated to `true`.
 A condition without an operator evaluates to `true` if the value is not considered `falsy`, i.e. if the value is not `null`, `false`, an empty collection, an empty map, an empty array, an empty string/char sequence or a number equal to zero.
 
-[source]
+[source,html]
 ----
 {#if item.active}
   This item is active.
@@ -788,68 +801,91 @@ A condition without an operator evaluates to `true` if the value is not consider
 You can also use the following operators in a condition:
 
 |===
-|Operator |Aliases |Precedence (higher wins)
+|Operator |Aliases |Precedence |Example | Description
 
 |logical complement
 |`!`
-| 4
+|4
+|`{#if !item.active}{/if}`
+|Inverts the evaluated value.
 
 |greater than
 |`gt`, `>`
-| 3
+|3
+|`{#if item.age > 43}This item is very old.{/if}`
+|Evaluates to `true` if `value1` is greater than `value2`.
 
 |greater than or equal to
 |`ge`, `>=`
 | 3
+|`{#if item.price >= 100}This item is expensive.{/if}`
+|Evaluates to `true` if `value1` is greater than or equal to `value2`.
 
 |less than
 |`lt`, `<`
 | 3
+|`{#if item.price < 100}This item is cheap.{/if}`
+|Evaluates to `true` if `value1` is less than `value2`.
 
 |less than or equal to
 |`le`, `\<=`
 | 3
+|`{#if item.age <= 43}This item is young.{/if}`
+|Evaluates to `true` if `value1` is less than or equal to `value2`.
 
 |equals
 |`eq`, `==`, `is`
 | 2
+|`{#if item.name eq 'Foo'}Foo item!{/if}`
+|Evaluates to `true` if `value1` is equal to `value2`.
 
 |not equals
 |`ne`, `!=`
 | 2
+|`{#if item.name != 'Bar'}Not a Bar item!{/if}`
+|Evaluates to `true` if `value1` is not equal to `value2`.
 
 |logical AND (short-circuiting)
 |`&&`, `and`
 | 1
+|`{#if item.price > 100 && item.isActive}Expensive and active item.{/if}`
+|Evaluates to `true` if both operands evaluate to `true`.
 
 |logical OR (short-circuiting)
 |`\|\|`, `or`
 | 1
+|`{#if item.price > 100 \|\| item.isActive}Expensive or active item.{/if}`
+|Evaluates to `true` if one of the operands evaluates to `true`.
 
 |===
 
-.A simple operator example
-[source]
-----
-{#if item.age > 10}
-  This item is very old.
-{/if}
-----
+For `>`, `>=`, `<`, and `\<=` the following rules are applied:
+
+* Neither of the operands may be `null`.
+* If both operands are of the same type that implements the `java.lang.Comparable` then the `Comparable#compareTo(T)` method is used to perform comparison.
+* Otherwise, both operands are coerced to `java.math.BigDecimal` first and then the `BigDecimal#compareTo(BigDecimal)` method is used to perform comparison.
+
+NOTE: Types that support coercion include `BigInteger`, `Integer`, `Long`, `Double`, `Float` and `String`.
+
+For `==` and `!=` the following rules are applied:
+
+* Operands are first tested using the `java.util.Objects#equals(Object, Object)` method. If it returns `true` the operands are considered equal.
+* Otherwise, if both operands are not `null` and at least one of them is an instance of `java.lang.Number`, then operands are coerced to `java.math.BigDecimal` and the `BigDecimal#compareTo(BigDecimal)` method is used to perform comparison.
 
 Multiple conditions are also supported.
 
 .Multiple conditions example
-[source]
+[source,html]
 ----
 {#if item.age > 10 && item.price > 500}
   This item is very old and expensive.
 {/if}
 ----
 
-Precedence rules can be overridden by parentheses.
+The default precedence rules (higher precedence wins) can be overridden by parentheses.
 
 .Parentheses example
-[source]
+[source,html]
 ----
 {#if (item.age > 10 || item.price > 500) && user.loggedIn}
   User must be logged in and item age must be > 10 or price must be > 500.
@@ -859,7 +895,7 @@ Precedence rules can be overridden by parentheses.
 
 You can also add any number of `else` blocks:
 
-[source]
+[source,html]
 ----
 {#if item.age > 10}
   This item is very old.
@@ -2971,10 +3007,9 @@ If there is a message bundle method that accepts a single parameter of an enum t
 @Message <1>
 String methodName(MyEnum enum);
 ----
-<1> The value is intentionally not provided. There's also no key for the method in a localized file.
+<1> The value is intentionally not provided. There's also no key/value pair for this method in a localized file.
 
-Then it receives a generated template:
-
+Then it receives a generated template like:
 [source,html]
 ----
 {#when enumParamName}
@@ -2983,7 +3018,8 @@ Then it receives a generated template:
 {/when}
 ----
 
-Furthermore, a special message method is generated for each enum constant. Finally, each localized file must contain keys and values for all constant message keys:
+Furthermore, a special message method is generated for each enum constant. 
+Finally, each localized file must contain keys and values for all enum constants:
 
 [source,poperties]
 ----
@@ -2991,7 +3027,18 @@ methodName_CONSTANT1=Value 1
 methodName_CONSTANT2=Value 2
 ----
 
-In a template, an enum constant can be localized with a message bundle method like `{msg:methodName(enumConstant)}`.
+// We need to escape the first underscore 
+// See https://docs.asciidoctor.org/asciidoc/latest/subs/prevent/
+[IMPORTANT] 
+.Message keys for enum constants
+==== 
+By default, the message key consists of the method name followed by the `\_` separator and the constant name.
+If any constant name of a particular enum contains the `_` or the `$` character then the `\_$` separator must be used for all message keys for this enum instead.
+For example, `methodName_$CONSTANT_1=Value 1` or `methodName_$CONSTANT$1=Value 1`.
+A constant of a localized enum may not contain the `_$` separator.
+====
+
+In a template, the localized message for an enum constant can be obtained with a message bundle method like `{msg:methodName(enumConstant)}`.
 
 TIP: There is also <<convenient-annotation-for-enums,`@TemplateEnum`>> - a convenient annotation to access enum constants in a template.
 

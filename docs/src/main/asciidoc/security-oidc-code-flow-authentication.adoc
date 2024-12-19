@@ -207,6 +207,18 @@ quarkus.oidc.credentials.jwt.key-id=mykeyAlias
 
 Using `client_secret_jwt` or `private_key_jwt` authentication methods ensures that a client secret does not get sent to the OIDC provider, therefore avoiding the risk of a secret being intercepted by a  'man-in-the-middle' attack.
 
+.Example how JWT Bearer token can be used to authenticate client
+
+[source,properties]
+----
+quarkus.oidc.auth-server-url=http://localhost:8180/realms/quarkus/
+quarkus.oidc.client-id=quarkus-app
+quarkus.oidc.credentials.jwt.source=bearer <1>
+quarkus.oidc.credentials.jwt.token-path=/var/run/secrets/tokens <2>
+----
+<1> Use JWT bearer token to authenticate OIDC provider client, see the link:https://www.rfc-editor.org/rfc/rfc7523#section-2.2[Using JWTs for Client Authentication] section for more information.
+<2> Path to a JWT bearer token. Quarkus loads a new token from a filesystem and reloads it when the token has expired.
+
 ==== Additional JWT authentication options
 
 If `client_secret_jwt`, `private_key_jwt`, or an Apple `post_jwt` authentication methods are used, then you can customize the JWT signature algorithm, key identifier, audience, subject and issuer.
@@ -392,9 +404,8 @@ package io.quarkus.it.keycloak;
 
 import jakarta.enterprise.context.ApplicationScoped;
 
-import org.jboss.logging.Logger;
-
 import io.quarkus.arc.Unremovable;
+import io.quarkus.logging.Log;
 import io.quarkus.oidc.common.OidcEndpoint;
 import io.quarkus.oidc.common.OidcEndpoint.Type;
 import io.quarkus.oidc.common.OidcResponseFilter;
@@ -405,8 +416,7 @@ import io.quarkus.oidc.runtime.OidcUtils;
 @Unremovable
 @OidcEndpoint(value = Type.TOKEN) <1>
 public class TokenEndpointResponseFilter implements OidcResponseFilter {
-    private static final Logger LOG = Logger.getLogger(TokenResponseFilter.class);
-
+    
     @Override
     public void filter(OidcResponseContext rc) {
         String contentType = rc.responseHeaders().get("Content-Type"); <2>
@@ -414,7 +424,7 @@ public class TokenEndpointResponseFilter implements OidcResponseFilter {
                 && OidcConstants.AUTHORIZATION_CODE.equals(rc.requestProperties().get(OidcConstants.GRANT_TYPE)) <3>
                 && "code-flow-user-info-cached-in-idtoken".equals(rc.requestProperties().get(OidcUtils.TENANT_ID_ATTRIBUTE)) <3>
                 && rc.responseBody().toJsonObject().containsKey("id_token")) { <4>
-            LOG.debug("Authorization code completed for tenant 'code-flow-user-info-cached-in-idtoken'");
+            Log.debug("Authorization code completed for tenant 'code-flow-user-info-cached-in-idtoken'");
         }
     }
 }
@@ -1082,6 +1092,38 @@ public class OidcDbTokenStateManagerEntity {
 For more information, refer to the xref:hibernate-orm.adoc[Hibernate ORM] guide.
 <2> You can choose a column length depending on the length of your tokens.
 endif::no-quarkus-oidc-db-token-state-manager[]
+
+[[redis-token-state-manager]]
+==== Redis TokenStateManager
+
+Another approach for a stateful token storage strategy is a custom `TokenStateManager` provided by Quarkus to have your application store tokens in a Redis cache.
+If you decided to use the OIDC Redis Token State Manager, you must add the following dependency:
+
+[source,xml,role="primary asciidoc-tabs-target-sync-cli asciidoc-tabs-target-sync-maven"]
+.pom.xml
+----
+<dependency>
+    <groupId>io.quarkus</groupId>
+    <artifactId>quarkus-oidc-redis-token-state-manager</artifactId>
+</dependency>
+----
+
+[source,gradle,role="secondary asciidoc-tabs-target-sync-gradle"]
+.build.gradle
+----
+implementation("io.quarkus:quarkus-oidc-redis-token-state-manager")
+----
+
+Quarkus stores tokens in the default Redis client.
+If you prefer to use different Redis client, you can configure it like in the example below:
+
+[source, properties]
+----
+quarkus.oidc.redis-token-state-manager.redis-client-name=my-redis-client <1>
+----
+<1> The `my-redis-client` name must correspond to the Redis client config key specified with `quarkus.redis.my-redis-client.*` configuration properties.
+
+Please refer to the xref:redis-reference.adoc[Quarkus Redis Client reference] for information how to configure the Redis client.
 
 === Logout and expiration
 
@@ -1778,6 +1820,49 @@ testImplementation("org.htmlunit:htmlunit")
 testImplementation("io.quarkus:quarkus-junit5")
 ----
 
+[[code-flow-integration-testing-keycloak-devservices]]
+=== Dev Services for Keycloak
+
+For integration testing against Keycloak, use xref:security-openid-connect-dev-services.adoc[Dev services for Keycloak].
+This service initializes a test container, creates a `quarkus` realm, and configures a `quarkus-app` client with the secret `secret`.
+It also sets up two users: `alice` with `admin` and `user` roles, and `bob` with the `user` role.
+All these properties are customizable. For details, see xref:security-openid-connect-dev-services.adoc#keycloak-initialization[Keycloak Initialization].
+
+First, prepare the `application.properties` file.
+
+If starting from an empty `application.properties` file, `Dev Services for Keycloak` automatically registers the following properties:
+
+- `quarkus.oidc.auth-server-url`, which points to the running test container.
+- `quarkus.oidc.client-id=quarkus-app`.
+- `quarkus.oidc.credentials.secret=secret`.
+
+If you already have the required `quarkus-oidc` properties configured, associate `quarkus.oidc.auth-server-url` with the `prod` profile.
+This ensures that `Dev Services for Keycloak` starts the container as expected.
+For example:
+
+[source,properties]
+----
+%prod.quarkus.oidc.auth-server-url=http://localhost:8180/realms/quarkus
+----
+
+To import a custom realm file into Keycloak before running the tests, configure `Dev services for Keycloak` as shown:
+
+[source,properties]
+----
+%prod.quarkus.oidc.auth-server-url=http://localhost:8180/realms/quarkus
+quarkus.keycloak.devservices.realm-path=quarkus-realm.json
+----
+
+Finally, write the test code as described in the <<code-flow-integration-testing-wiremock,Wiremock>> section.  
+The only difference is that `@QuarkusTestResource` is no longer required:
+
+[source, java]
+----
+@QuarkusTest
+public class CodeFlowAuthorizationTest {
+}
+----
+
 [[code-flow-integration-testing-wiremock]]
 === Wiremock
 
@@ -1864,41 +1949,6 @@ The user `admin` has the `user` and `admin` roles by default - it can be customi
 Additionally, `OidcWiremockTestResource` sets the token issuer and audience to `https://service.example.com`,  which can be customized with `quarkus.test.oidc.token.issuer` and `quarkus.test.oidc.token.audience` system properties.
 
 `OidcWiremockTestResource` can be used to emulate all OIDC providers.
-
-[[code-flow-integration-testing-keycloak-devservices]]
-=== Dev Services for Keycloak
-
-Using xref:security-openid-connect-dev-services.adoc[Dev Services for Keycloak] is recommended for integration testing against Keycloak.
-`Dev Services for Keycloak` will start and initialize a test container: it will create a `quarkus` realm, a `quarkus-app` client (`secret` secret), and add `alice` (`admin` and `user` roles) and `bob` (`user` role) users, where all of these properties can be customized.
-
-First, prepare `application.properties`.
-You can start with a completely empty `application.properties` file as `Dev Services for Keycloak` will register `quarkus.oidc.auth-server-url` pointing to the running test container as well as `quarkus.oidc.client-id=quarkus-app` and `quarkus.oidc.credentials.secret=secret`.
-
-However, if you already have all the required `quarkus-oidc` properties configured, then you only need to associate `quarkus.oidc.auth-server-url` with the `prod` profile for `Dev Services for Keycloak` to start a container.
-For example:
-
-[source,properties]
-----
-%prod.quarkus.oidc.auth-server-url=http://localhost:8180/realms/quarkus
-----
-
-If a custom realm file has to be imported into Keycloak before running the tests, then you can configure `Dev Services for Keycloak` as follows:
-
-[source,properties]
-----
-%prod.quarkus.oidc.auth-server-url=http://localhost:8180/realms/quarkus
-quarkus.keycloak.devservices.realm-path=quarkus-realm.json
-----
-
-Finally, write a test code the same way as it is described in the <<code-flow-integration-testing-wiremock,Wiremock>> section.
-The only difference is that `@QuarkusTestResource` is no longer needed:
-
-[source, java]
-----
-@QuarkusTest
-public class CodeFlowAuthorizationTest {
-}
-----
 
 ifndef::no-deprecated-test-resource[]
 [[code-flow-integration-testing-keycloak]]

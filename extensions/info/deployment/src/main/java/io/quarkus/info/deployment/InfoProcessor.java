@@ -4,13 +4,13 @@ import static java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME;
 
 import java.io.File;
 import java.net.InetAddress;
+import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.Collection;
-import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TimeZone;
 import java.util.stream.Collectors;
 
 import jakarta.enterprise.context.ApplicationScoped;
@@ -34,6 +34,7 @@ import io.quarkus.deployment.annotations.BuildProducer;
 import io.quarkus.deployment.annotations.BuildStep;
 import io.quarkus.deployment.annotations.ExecutionTime;
 import io.quarkus.deployment.annotations.Record;
+import io.quarkus.deployment.builditem.ApplicationInfoBuildItem;
 import io.quarkus.deployment.pkg.builditem.CurateOutcomeBuildItem;
 import io.quarkus.deployment.pkg.builditem.OutputTargetBuildItem;
 import io.quarkus.info.BuildInfo;
@@ -70,11 +71,10 @@ public class InfoProcessor {
             log.debug("Project is not checked in to git");
             return;
         }
-        try (Repository repository = repositoryBuilder.build()) {
+        try (Repository repository = repositoryBuilder.build();
+                Git git = Git.wrap(repository)) {
 
-            RevCommit latestCommit = new Git(repository).log().setMaxCount(1).call().iterator().next();
-            Date commitDate = new Date(latestCommit.getCommitTime() * 1000L);
-            TimeZone commitTimeZone = TimeZone.getDefault();
+            RevCommit latestCommit = git.log().setMaxCount(1).call().iterator().next();
 
             boolean addFullInfo = config.git().mode() == InfoBuildTimeConfig.Git.Mode.FULL;
 
@@ -85,16 +85,17 @@ public class InfoProcessor {
             Map<String, Object> commit = new LinkedHashMap<>();
             String latestCommitId = latestCommit.getName();
             commit.put("id", latestCommitId);
-            String latestCommitTime = formatDate(commitDate, commitTimeZone);
+            String latestCommitTime = formatDate(Instant.ofEpochSecond(latestCommit.getCommitTime()), ZoneId.systemDefault());
             commit.put("time", latestCommitTime);
 
             if (addFullInfo) {
 
                 PersonIdent authorIdent = latestCommit.getAuthorIdent();
-                commit.put("author", Map.of("time", formatDate(authorIdent.getWhen(), authorIdent.getTimeZone())));
+                commit.put("author", Map.of("time", formatDate(authorIdent.getWhenAsInstant(), authorIdent.getZoneId())));
 
                 PersonIdent committerIdent = latestCommit.getCommitterIdent();
-                commit.put("committer", Map.of("time", formatDate(committerIdent.getWhen(), committerIdent.getTimeZone())));
+                commit.put("committer",
+                        Map.of("time", formatDate(committerIdent.getWhenAsInstant(), committerIdent.getZoneId())));
 
                 Map<String, String> user = new LinkedHashMap<>();
                 user.put("email", authorIdent.getEmailAddress());
@@ -111,7 +112,9 @@ public class InfoProcessor {
 
                 commit.put("id", id);
 
-                data.put("tags", getTags(repository, latestCommit));
+                data.put("remote",
+                        GitUtil.sanitizeRemoteUrl(git.getRepository().getConfig().getString("remote", "origin", "url")));
+                data.put("tags", getTags(git, latestCommit));
             }
 
             data.put("commit", commit);
@@ -130,9 +133,8 @@ public class InfoProcessor {
         }
     }
 
-    private String formatDate(Date date, TimeZone timeZone) {
-        return ISO_OFFSET_DATE_TIME.format(
-                OffsetDateTime.ofInstant(date.toInstant(), timeZone.toZoneId()));
+    private String formatDate(Instant instant, ZoneId zoneId) {
+        return ISO_OFFSET_DATE_TIME.format(OffsetDateTime.ofInstant(instant, zoneId));
     }
 
     private Map<String, Object> obtainBuildInfo(CurateOutcomeBuildItem curateOutcomeBuildItem,
@@ -160,13 +162,11 @@ public class InfoProcessor {
         return build;
     }
 
-    public Collection<String> getTags(Repository repo, final ObjectId objectId) throws GitAPIException {
-        try (Git git = Git.wrap(repo)) {
-            try (RevWalk walk = new RevWalk(repo)) {
-                Collection<String> tags = getTags(git, objectId, walk);
-                walk.dispose();
-                return tags;
-            }
+    public Collection<String> getTags(final Git git, final ObjectId objectId) throws GitAPIException {
+        try (RevWalk walk = new RevWalk(git.getRepository())) {
+            Collection<String> tags = getTags(git, objectId, walk);
+            walk.dispose();
+            return tags;
         }
     }
 
@@ -211,10 +211,13 @@ public class InfoProcessor {
             InfoBuildTimeConfig config,
             BuildProducer<InfoBuildTimeValuesBuildItem> valuesProducer,
             BuildProducer<SyntheticBeanBuildItem> beanProducer,
+            ApplicationInfoBuildItem infoApplication,
             InfoRecorder recorder) {
         ApplicationModel applicationModel = curateOutcomeBuildItem.getApplicationModel();
         ResolvedDependency appArtifact = applicationModel.getAppArtifact();
         Map<String, Object> buildData = new LinkedHashMap<>();
+        String name = infoApplication.getName();
+        buildData.put("name", name);
         String group = appArtifact.getGroupId();
         buildData.put("group", group);
         String artifact = appArtifact.getArtifactId();

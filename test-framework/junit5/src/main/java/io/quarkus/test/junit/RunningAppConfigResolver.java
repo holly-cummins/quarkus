@@ -17,6 +17,8 @@ class RunningAppConfigResolver extends ConfigProviderResolver {
 
     RunningAppConfigResolver(RunningQuarkusApplication runningQuarkusApplication) {
         this.runningQuarkusApplication = runningQuarkusApplication;
+        System.out.println("HOLLY constructing with " + this.getClass().getClassLoader());
+        System.out.println("HOLLY running app is " + runningQuarkusApplication);
     }
 
     @Override
@@ -44,7 +46,7 @@ class RunningAppConfigResolver extends ConfigProviderResolver {
 
             @Override
             public ConfigValue getConfigValue(final String propertyName) {
-                throw illegalStateException();
+                return runningQuarkusApplication.getConfigValue(propertyName, ConfigValue.class).get();
             }
 
             @Override

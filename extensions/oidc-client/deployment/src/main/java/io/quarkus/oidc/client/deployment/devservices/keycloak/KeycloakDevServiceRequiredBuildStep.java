@@ -1,21 +1,19 @@
 package io.quarkus.oidc.client.deployment.devservices.keycloak;
 
-import static io.quarkus.devservices.keycloak.KeycloakDevServicesRequiredBuildItem.OIDC_AUTH_SERVER_URL_CONFIG_KEY;
-
 import java.util.HashMap;
 
 import io.quarkus.deployment.IsDevelopment;
 import io.quarkus.deployment.IsNormal;
 import io.quarkus.deployment.annotations.BuildStep;
 import io.quarkus.deployment.annotations.BuildSteps;
-import io.quarkus.deployment.dev.devservices.GlobalDevServicesConfig;
+import io.quarkus.deployment.dev.devservices.DevServicesConfig;
 import io.quarkus.devservices.keycloak.KeycloakAdminPageBuildItem;
 import io.quarkus.devservices.keycloak.KeycloakDevServicesConfig;
 import io.quarkus.devservices.keycloak.KeycloakDevServicesRequiredBuildItem;
 import io.quarkus.devui.spi.page.CardPageBuildItem;
 import io.quarkus.oidc.client.deployment.OidcClientBuildStep;
 
-@BuildSteps(onlyIfNot = IsNormal.class, onlyIf = { OidcClientBuildStep.IsEnabled.class, GlobalDevServicesConfig.Enabled.class })
+@BuildSteps(onlyIfNot = IsNormal.class, onlyIf = { OidcClientBuildStep.IsEnabled.class, DevServicesConfig.Enabled.class })
 public class KeycloakDevServiceRequiredBuildStep {
 
     private static final String CONFIG_PREFIX = "quarkus.oidc-client.";
@@ -35,7 +33,7 @@ public class KeycloakDevServiceRequiredBuildStep {
                 configProperties.put(OIDC_CLIENT_SECRET_CONFIG_KEY, ctx.oidcClientSecret());
             }
             return configProperties;
-        }, OIDC_CLIENT_AUTH_SERVER_URL_CONFIG_KEY, OIDC_CLIENT_TOKEN_PATH_CONFIG_KEY, OIDC_AUTH_SERVER_URL_CONFIG_KEY);
+        }, OIDC_CLIENT_AUTH_SERVER_URL_CONFIG_KEY, OIDC_CLIENT_TOKEN_PATH_CONFIG_KEY);
     }
 
     @BuildStep(onlyIf = IsDevelopment.class)
