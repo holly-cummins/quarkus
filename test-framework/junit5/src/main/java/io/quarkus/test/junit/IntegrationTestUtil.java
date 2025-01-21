@@ -29,7 +29,7 @@ import jakarta.enterprise.inject.Alternative;
 import jakarta.inject.Inject;
 
 import org.apache.commons.lang3.RandomStringUtils;
-import org.eclipse.microprofile.config.Config;
+import org.eclipse.microprofile.config.ConfigProvider;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.jandex.Index;
 import org.junit.jupiter.api.extension.ExtensionContext;
@@ -44,14 +44,13 @@ import io.quarkus.bootstrap.utils.BuildToolHelper;
 import io.quarkus.bootstrap.workspace.ArtifactSources;
 import io.quarkus.bootstrap.workspace.SourceDir;
 import io.quarkus.deployment.builditem.DevServicesLauncherConfigResultBuildItem;
+import io.quarkus.deployment.dev.testing.TestClassIndexer;
 import io.quarkus.deployment.util.ContainerRuntimeUtil;
 import io.quarkus.paths.PathList;
 import io.quarkus.runtime.LaunchMode;
 import io.quarkus.runtime.logging.LoggingSetupRecorder;
 import io.quarkus.test.common.ArtifactLauncher;
-import io.quarkus.test.common.LauncherUtil;
 import io.quarkus.test.common.PathTestHelper;
-import io.quarkus.test.common.TestClassIndexer;
 import io.quarkus.test.common.TestResourceManager;
 import io.quarkus.test.common.http.TestHTTPResourceManager;
 
@@ -173,7 +172,7 @@ public final class IntegrationTestUtil {
             boolean isDockerAppLaunch) throws Exception {
         Class<?> requiredTestClass = context.getRequiredTestClass();
         Path testClassLocation = getTestClassesLocation(requiredTestClass);
-        final Path appClassLocation = getAppClassLocationForTestLocation(testClassLocation.toString());
+        final Path appClassLocation = getAppClassLocationForTestLocation(testClassLocation);
 
         final PathList.Builder rootBuilder = PathList.builder();
 
@@ -276,9 +275,8 @@ public final class IntegrationTestUtil {
             } catch (Exception e) {
                 // use the network the use has specified or else just generate one if none is configured
 
-                Config config = LauncherUtil.installAndGetSomeConfig();
-                Optional<String> networkIdOpt = config
-                        .getOptionalValue("quarkus.test.container.network", String.class);
+                Optional<String> networkIdOpt = ConfigProvider.getConfig().getOptionalValue("quarkus.test.container.network",
+                        String.class);
                 if (networkIdOpt.isPresent()) {
                     networkId = networkIdOpt.get();
                 } else {

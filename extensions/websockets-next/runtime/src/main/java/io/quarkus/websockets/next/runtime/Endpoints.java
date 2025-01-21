@@ -4,21 +4,20 @@ import java.time.Duration;
 import java.util.Optional;
 import java.util.function.Consumer;
 
-import jakarta.enterprise.context.SessionScoped;
-
 import org.jboss.logging.Logger;
 
 import io.netty.handler.codec.http.websocketx.WebSocketCloseStatus;
 import io.quarkus.arc.ArcContainer;
 import io.quarkus.arc.InjectableContext;
+import io.quarkus.arc.ManagedContext;
 import io.quarkus.runtime.LaunchMode;
 import io.quarkus.security.AuthenticationFailedException;
 import io.quarkus.security.ForbiddenException;
 import io.quarkus.security.UnauthorizedException;
 import io.quarkus.websockets.next.CloseReason;
-import io.quarkus.websockets.next.UnhandledFailureStrategy;
 import io.quarkus.websockets.next.WebSocketException;
-import io.quarkus.websockets.next.runtime.WebSocketSessionContext.SessionContextState;
+import io.quarkus.websockets.next.runtime.config.UnhandledFailureStrategy;
+import io.quarkus.websockets.next.runtime.telemetry.ErrorInterceptor;
 import io.quarkus.websockets.next.runtime.telemetry.TelemetrySupport;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.operators.multi.processors.BroadcastProcessor;
@@ -27,6 +26,8 @@ import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.WebSocketBase;
+import io.vertx.core.http.WebSocketFrame;
+import io.vertx.core.http.WebSocketFrameType;
 
 class Endpoints {
 
@@ -42,11 +43,11 @@ class Endpoints {
 
         // Initialize and capture the session context state that will be activated
         // during message processing
-        WebSocketSessionContext sessionContext = null;
-        SessionContextState sessionContextState = null;
+        ManagedContext sessionContext = null;
+        InjectableContext.ContextState sessionContextState = null;
         if (activateSessionContext) {
-            sessionContext = sessionContext(container);
-            sessionContextState = sessionContext.initializeContextState();
+            sessionContext = container.sessionContext();
+            sessionContextState = sessionContext.initializeState();
         }
         ContextSupport contextSupport = new ContextSupport(connection, sessionContextState,
                 sessionContext, activateRequestContext ? container.requestContext() : null);
@@ -192,13 +193,24 @@ class Endpoints {
             }, false);
         }
 
+        pingMessageHandler(connection, endpoint, ws, onOpenContext, m -> {
+            endpoint.onPingMessage(m).onComplete(r -> {
+                if (r.succeeded()) {
+                    LOG.debugf("@OnPingMessage callback consumed application message: %s", connection);
+                } else {
+                    handleFailure(unhandledFailureStrategy, r.cause(),
+                            "Unable to consume application message in @OnPingMessage callback", connection);
+                }
+            });
+        });
+
         pongMessageHandler(connection, endpoint, ws, onOpenContext, m -> {
             endpoint.onPongMessage(m).onComplete(r -> {
                 if (r.succeeded()) {
-                    LOG.debugf("@OnPongMessage callback consumed text message: %s", connection);
+                    LOG.debugf("@OnPongMessage callback consumed application message: %s", connection);
                 } else {
                     handleFailure(unhandledFailureStrategy, r.cause(),
-                            "Unable to consume text message in @OnPongMessage callback", connection);
+                            "Unable to consume application message in @OnPongMessage callback", connection);
                 }
             });
         });
@@ -362,6 +374,24 @@ class Endpoints {
         });
     }
 
+    private static void pingMessageHandler(WebSocketConnectionBase connection, WebSocketEndpoint endpoint, WebSocketBase ws,
+            Context context, Consumer<Buffer> pingAction) {
+        ws.frameHandler(new Handler<WebSocketFrame>() {
+            @Override
+            public void handle(WebSocketFrame frame) {
+                if (frame.type() == WebSocketFrameType.PING) {
+                    Context duplicatedContext = ContextSupport.createNewDuplicatedContext(context, connection);
+                    duplicatedContext.runOnContext(new Handler<Void>() {
+                        @Override
+                        public void handle(Void event) {
+                            pingAction.accept(frame.binaryData());
+                        }
+                    });
+                }
+            }
+        });
+    }
+
     private static void pongMessageHandler(WebSocketConnectionBase connection, WebSocketEndpoint endpoint, WebSocketBase ws,
             Context context, Consumer<Buffer> pongAction) {
         ws.pongHandler(new Handler<Buffer>() {
@@ -390,10 +420,11 @@ class Endpoints {
             Class<? extends WebSocketEndpoint> endpointClazz = (Class<? extends WebSocketEndpoint>) cl
                     .loadClass(endpointClassName);
 
+            ErrorInterceptor errorInterceptor = telemetrySupport == null ? null : telemetrySupport.getErrorInterceptor();
             WebSocketEndpoint endpoint = (WebSocketEndpoint) endpointClazz
                     .getDeclaredConstructor(WebSocketConnectionBase.class, Codecs.class, ContextSupport.class,
-                            SecuritySupport.class)
-                    .newInstance(connection, codecs, contextSupport, securitySupport);
+                            SecuritySupport.class, ErrorInterceptor.class)
+                    .newInstance(connection, codecs, contextSupport, securitySupport, errorInterceptor);
             if (telemetrySupport != null) {
                 return telemetrySupport.decorate(endpoint, connection);
             }
@@ -404,12 +435,4 @@ class Endpoints {
         }
     }
 
-    private static WebSocketSessionContext sessionContext(ArcContainer container) {
-        for (InjectableContext injectableContext : container.getContexts(SessionScoped.class)) {
-            if (WebSocketSessionContext.class.equals(injectableContext.getClass())) {
-                return (WebSocketSessionContext) injectableContext;
-            }
-        }
-        throw new WebSocketException("CDI session context not registered");
-    }
 }

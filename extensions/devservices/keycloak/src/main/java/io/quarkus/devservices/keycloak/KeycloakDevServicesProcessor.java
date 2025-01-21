@@ -60,7 +60,7 @@ import io.quarkus.deployment.builditem.DockerStatusBuildItem;
 import io.quarkus.deployment.builditem.LaunchModeBuildItem;
 import io.quarkus.deployment.console.ConsoleInstalledBuildItem;
 import io.quarkus.deployment.console.StartupLogCompressor;
-import io.quarkus.deployment.dev.devservices.GlobalDevServicesConfig;
+import io.quarkus.deployment.dev.devservices.DevServicesConfig;
 import io.quarkus.deployment.logging.LoggingSetupBuildItem;
 import io.quarkus.devservices.common.ConfigureUtil;
 import io.quarkus.devservices.common.ContainerAddress;
@@ -78,7 +78,7 @@ import io.vertx.mutiny.core.buffer.Buffer;
 import io.vertx.mutiny.ext.web.client.HttpResponse;
 import io.vertx.mutiny.ext.web.client.WebClient;
 
-@BuildSteps(onlyIfNot = IsNormal.class, onlyIf = GlobalDevServicesConfig.Enabled.class)
+@BuildSteps(onlyIfNot = IsNormal.class, onlyIf = DevServicesConfig.Enabled.class)
 public class KeycloakDevServicesProcessor {
 
     private static final Logger LOG = Logger.getLogger(KeycloakDevServicesProcessor.class);
@@ -109,8 +109,8 @@ public class KeycloakDevServicesProcessor {
 
     // Properties recognized by Quarkus-powered Keycloak
     private static final String KEYCLOAK_QUARKUS_HOSTNAME = "KC_HOSTNAME";
-    private static final String KEYCLOAK_QUARKUS_ADMIN_PROP = "KEYCLOAK_ADMIN";
-    private static final String KEYCLOAK_QUARKUS_ADMIN_PASSWORD_PROP = "KEYCLOAK_ADMIN_PASSWORD";
+    private static final String KEYCLOAK_QUARKUS_ADMIN_PROP = "KC_BOOTSTRAP_ADMIN_USERNAME";
+    private static final String KEYCLOAK_QUARKUS_ADMIN_PASSWORD_PROP = "KC_BOOTSTRAP_ADMIN_PASSWORD";
     private static final String KEYCLOAK_QUARKUS_START_CMD = "start --http-enabled=true --hostname-strict=false "
             + "--spi-user-profile-declarative-user-profile-config-file=/opt/keycloak/upconfig.json";
 
@@ -142,10 +142,11 @@ public class KeycloakDevServicesProcessor {
             LaunchModeBuildItem launchMode,
             Optional<ConsoleInstalledBuildItem> consoleInstalledBuildItem,
             LoggingSetupBuildItem loggingSetupBuildItem,
-            GlobalDevServicesConfig devServicesConfig, DockerStatusBuildItem dockerStatusBuildItem) {
+            DevServicesConfig devServicesConfig, DockerStatusBuildItem dockerStatusBuildItem) {
 
         if (devSvcRequiredMarkerItems.isEmpty()
-                || linuxContainersNotAvailable(dockerStatusBuildItem, devSvcRequiredMarkerItems)) {
+                || linuxContainersNotAvailable(dockerStatusBuildItem, devSvcRequiredMarkerItems)
+                || oidcDevServicesEnabled()) {
             if (devService != null) {
                 closeDevService();
             }
@@ -248,6 +249,10 @@ public class KeycloakDevServicesProcessor {
         return devService.toBuildItem();
     }
 
+    private static boolean oidcDevServicesEnabled() {
+        return ConfigProvider.getConfig().getOptionalValue("quarkus.oidc.devservices.enabled", boolean.class).orElse(false);
+    }
+
     private static boolean linuxContainersNotAvailable(DockerStatusBuildItem dockerStatusBuildItem,
             List<KeycloakDevServicesRequiredBuildItem> devSvcRequiredMarkerItems) {
         if (dockerStatusBuildItem.isContainerRuntimeAvailable()) {
@@ -303,7 +308,7 @@ public class KeycloakDevServicesProcessor {
             BuildProducer<KeycloakDevServicesConfigBuildItem> keycloakBuildItemBuildProducer, String internalURL,
             String hostURL, List<RealmRepresentation> realmReps, List<String> errors,
             KeycloakDevServicesConfigurator devServicesConfigurator, String internalBaseUrl) {
-        final String realmName = realmReps != null && !realmReps.isEmpty() ? realmReps.iterator().next().getRealm()
+        final String realmName = !realmReps.isEmpty() ? realmReps.iterator().next().getRealm()
                 : getDefaultRealmName();
         final String authServerInternalUrl = realmsURL(internalURL, realmName);
 
@@ -320,29 +325,32 @@ public class KeycloakDevServicesProcessor {
 
         List<String> realmNames = new LinkedList<>();
 
-        // this needs to be only if we actually start the dev-service as it adds a shutdown hook
-        // whose TCCL is the Augmentation CL, which if not removed, causes a massive memory leaks
-        if (vertxInstance == null) {
-            vertxInstance = Vertx.vertx();
-        }
+        if (createDefaultRealm || !realmReps.isEmpty()) {
 
-        WebClient client = createWebClient(vertxInstance);
-        try {
-            String adminToken = getAdminToken(client, clientAuthServerBaseUrl);
-            if (createDefaultRealm) {
-                createDefaultRealm(client, adminToken, clientAuthServerBaseUrl, users, oidcClientId, oidcClientSecret, errors,
-                        devServicesConfigurator);
-                realmNames.add(realmName);
-            } else {
-                if (realmReps != null) {
+            // this needs to be only if we actually start the dev-service as it adds a shutdown hook
+            // whose TCCL is the Augmentation CL, which if not removed, causes a massive memory leaks
+            if (vertxInstance == null) {
+                vertxInstance = Vertx.vertx();
+            }
+
+            WebClient client = createWebClient(vertxInstance);
+            try {
+                String adminToken = getAdminToken(client, clientAuthServerBaseUrl);
+                if (createDefaultRealm) {
+                    createDefaultRealm(client, adminToken, clientAuthServerBaseUrl, users, oidcClientId, oidcClientSecret,
+                            errors,
+                            devServicesConfigurator);
+                    realmNames.add(realmName);
+                } else if (realmReps != null) {
                     for (RealmRepresentation realmRep : realmReps) {
                         createRealm(client, adminToken, clientAuthServerBaseUrl, realmRep, errors);
                         realmNames.add(realmRep.getRealm());
                     }
                 }
+
+            } finally {
+                client.close();
             }
-        } finally {
-            client.close();
         }
 
         Map<String, String> configProperties = new HashMap<>();
@@ -427,7 +435,7 @@ public class KeycloakDevServicesProcessor {
                     // TODO: this probably needs to be addressed
                     String sharedContainerUrl = getSharedContainerUrl(containerAddress);
                     Map<String, String> configs = prepareConfiguration(keycloakBuildItemBuildProducer, sharedContainerUrl,
-                            sharedContainerUrl, null, errors, devServicesConfigurator, sharedContainerUrl);
+                            sharedContainerUrl, List.of(), errors, devServicesConfigurator, sharedContainerUrl);
                     return new RunningDevService(KEYCLOAK_CONTAINER_NAME, containerAddress.getId(), null, configs);
                 })
                 .orElseGet(defaultKeycloakContainerSupplier);

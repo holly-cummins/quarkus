@@ -21,9 +21,10 @@ import io.quarkus.tls.TlsConfigurationRegistry;
 import io.quarkus.websockets.next.WebSocketClientConnection;
 import io.quarkus.websockets.next.WebSocketClientException;
 import io.quarkus.websockets.next.WebSocketConnector;
-import io.quarkus.websockets.next.WebSocketsClientRuntimeConfig;
 import io.quarkus.websockets.next.runtime.WebSocketClientRecorder.ClientEndpoint;
 import io.quarkus.websockets.next.runtime.WebSocketClientRecorder.ClientEndpointsContext;
+import io.quarkus.websockets.next.runtime.config.WebSocketsClientRuntimeConfig;
+import io.quarkus.websockets.next.runtime.telemetry.SendingInterceptor;
 import io.quarkus.websockets.next.runtime.telemetry.WebSocketTelemetryProvider;
 import io.smallrye.mutiny.Uni;
 import io.vertx.core.AsyncResult;
@@ -133,10 +134,11 @@ public class WebSocketConnectorImpl<CLIENT> extends WebSocketConnectorBase<WebSo
         });
         return websocket.map(ws -> {
             TrafficLogger trafficLogger = TrafficLogger.forClient(config);
+            SendingInterceptor sendingInterceptor = telemetrySupport == null ? null : telemetrySupport.getSendingInterceptor();
             WebSocketClientConnectionImpl connection = new WebSocketClientConnectionImpl(clientEndpoint.clientId, ws,
                     codecs,
                     pathParams,
-                    serverEndpointUri, headers, trafficLogger);
+                    serverEndpointUri, headers, trafficLogger, sendingInterceptor);
             if (trafficLogger != null) {
                 trafficLogger.connectionOpened(connection);
             }

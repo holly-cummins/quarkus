@@ -80,6 +80,7 @@ import static org.jboss.resteasy.reactive.common.processor.ResteasyReactiveDotNa
 import static org.jboss.resteasy.reactive.common.processor.ResteasyReactiveDotNames.UNI;
 import static org.jboss.resteasy.reactive.common.processor.ResteasyReactiveDotNames.URI_INFO;
 import static org.jboss.resteasy.reactive.common.processor.ResteasyReactiveDotNames.YEAR;
+import static org.jboss.resteasy.reactive.common.processor.ResteasyReactiveDotNames.YEAR_MONTH;
 import static org.jboss.resteasy.reactive.common.processor.ResteasyReactiveDotNames.ZONED_DATE_TIME;
 
 import java.lang.reflect.Modifier;
@@ -88,6 +89,7 @@ import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.util.AbstractMap;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -156,7 +158,7 @@ public abstract class EndpointIndexer<T extends EndpointIndexer<T, PARAM, METHOD
             RESOURCE_INFO);
 
     protected static final Set<DotName> SUPPORT_TEMPORAL_PARAMS = Set.of(INSTANT, LOCAL_DATE, LOCAL_TIME, LOCAL_DATE_TIME,
-            OFFSET_TIME, OFFSET_DATE_TIME, ZONED_DATE_TIME, YEAR);
+            OFFSET_TIME, OFFSET_DATE_TIME, ZONED_DATE_TIME, YEAR, YEAR_MONTH);
 
     protected static final Logger log = Logger.getLogger(EndpointIndexer.class);
     protected static final String[] EMPTY_STRING_ARRAY = new String[] {};
@@ -239,6 +241,7 @@ public abstract class EndpointIndexer<T extends EndpointIndexer<T, PARAM, METHOD
     private final Function<ClassInfo, Supplier<Boolean>> isDisabledCreator;
 
     private final Predicate<Map<DotName, AnnotationInstance>> skipMethodParameter;
+    private final List<Predicate<ClassInfo>> validateEndpoint;
     private final boolean skipNotRestParameters;
 
     private SerializerScanningResult serializerScanningResult;
@@ -267,6 +270,7 @@ public abstract class EndpointIndexer<T extends EndpointIndexer<T, PARAM, METHOD
         this.isDisabledCreator = builder.isDisabledCreator;
         this.skipMethodParameter = builder.skipMethodParameter;
         this.skipNotRestParameters = builder.skipNotRestParameters;
+        this.validateEndpoint = builder.defaultPredicate;
     }
 
     public Optional<ResourceClass> createEndpoints(ClassInfo classInfo, boolean considerApplication) {
@@ -324,14 +328,18 @@ public abstract class EndpointIndexer<T extends EndpointIndexer<T, PARAM, METHOD
 
             return Optional.of(clazz);
         } catch (Exception e) {
-            if (Modifier.isInterface(classInfo.flags()) || Modifier.isAbstract(classInfo.flags())) {
-                //kinda bogus, but we just ignore failed interfaces for now
-                //they can have methods that are not valid until they are actually extended by a concrete type
-                log.debug("Ignoring interface " + classInfo.name(), e);
-                return Optional.empty();
+            for (Predicate<ClassInfo> predicate : validateEndpoint) {
+                if (predicate.test(classInfo)) {
+                    //kinda bogus, but we just ignore failed interfaces for now
+                    //they can have methods that are not valid until they are actually extended by a concrete type
+                    log.debug("Ignoring interface " + classInfo.name(), e);
+                } else {
+                    throw new RuntimeException(e);
+                }
             }
-            throw new RuntimeException(e);
+            return Optional.empty();
         }
+
     }
 
     private String sanitizePath(String path) {
@@ -721,7 +729,7 @@ public abstract class EndpointIndexer<T extends EndpointIndexer<T, PARAM, METHOD
             }
             Set<String> nameBindingNames = nameBindingNames(currentMethodInfo, classNameBindings);
             boolean blocking = isBlocking(currentMethodInfo, defaultBlocking);
-            boolean runOnVirtualThread = isRunOnVirtualThread(currentMethodInfo, defaultBlocking);
+            boolean runOnVirtualThread = isRunOnVirtualThread(currentMethodInfo, blocking, defaultBlocking);
             // we want to allow "overriding" the blocking/non-blocking setting from an implementation class
             // when the class defining the annotations is an interface
             if (!actualEndpointInfo.equals(currentClassInfo) && Modifier.isInterface(currentClassInfo.flags())) {
@@ -732,7 +740,7 @@ public abstract class EndpointIndexer<T extends EndpointIndexer<T, PARAM, METHOD
                     //would be reached for a default
                     blocking = isBlocking(actualMethodInfo,
                             blocking ? BlockingDefault.BLOCKING : BlockingDefault.NON_BLOCKING);
-                    runOnVirtualThread = isRunOnVirtualThread(actualMethodInfo,
+                    runOnVirtualThread = isRunOnVirtualThread(actualMethodInfo, blocking,
                             blocking ? BlockingDefault.BLOCKING : BlockingDefault.NON_BLOCKING);
                 }
             }
@@ -834,8 +842,7 @@ public abstract class EndpointIndexer<T extends EndpointIndexer<T, PARAM, METHOD
         return value;
     }
 
-    private boolean isRunOnVirtualThread(MethodInfo info, BlockingDefault defaultValue) {
-        boolean isRunOnVirtualThread = false;
+    private boolean isRunOnVirtualThread(MethodInfo info, boolean blocking, BlockingDefault defaultValue) {
         Map.Entry<AnnotationTarget, AnnotationInstance> runOnVirtualThreadAnnotation = getInheritableAnnotation(info,
                 RUN_ON_VIRTUAL_THREAD);
 
@@ -849,28 +856,19 @@ public abstract class EndpointIndexer<T extends EndpointIndexer<T, PARAM, METHOD
                 throw new DeploymentException("Method '" + info.name() + "' of class '" + info.declaringClass().name()
                         + "' uses @RunOnVirtualThread but the target JDK version doesn't support virtual threads. Please configure your build tool to target Java 19 or above");
             }
-            isRunOnVirtualThread = true;
-        }
-
-        //BlockingDefault.BLOCKING should mean "block a platform thread" ? here it does
-        if (defaultValue == BlockingDefault.BLOCKING) {
-            return false;
+            if (!blocking) {
+                throw new DeploymentException(
+                        "Method '" + info.name() + "' of class '" + info.declaringClass().name()
+                                + "' is considered a non blocking method. @RunOnVirtualThread can only be used on " +
+                                " methods considered blocking");
+            } else {
+                return true;
+            }
         } else if (defaultValue == BlockingDefault.RUN_ON_VIRTUAL_THREAD) {
-            isRunOnVirtualThread = true;
-        } else if (defaultValue == BlockingDefault.NON_BLOCKING) {
+            return true;
+        } else {
             return false;
         }
-
-        if (isRunOnVirtualThread && !isBlocking(info, defaultValue)) {
-            throw new DeploymentException(
-                    "Method '" + info.name() + "' of class '" + info.declaringClass().name()
-                            + "' is considered a non blocking method. @RunOnVirtualThread can only be used on " +
-                            " methods considered blocking");
-        } else if (isRunOnVirtualThread) {
-            return true;
-        }
-
-        return false;
     }
 
     private boolean isBlocking(MethodInfo info, BlockingDefault defaultValue) {
@@ -1708,6 +1706,13 @@ public abstract class EndpointIndexer<T extends EndpointIndexer<T, PARAM, METHOD
         private Function<ClassInfo, Supplier<Boolean>> isDisabledCreator = null;
 
         private Predicate<Map<DotName, AnnotationInstance>> skipMethodParameter = null;
+        private List<Predicate<ClassInfo>> defaultPredicate = Arrays.asList(new Predicate<>() {
+            @Override
+            public boolean test(ClassInfo classInfo) {
+                return Modifier.isInterface(classInfo.flags())
+                        || Modifier.isAbstract(classInfo.flags());
+            }
+        });
 
         private boolean skipNotRestParameters = false;
 
@@ -1841,6 +1846,14 @@ public abstract class EndpointIndexer<T extends EndpointIndexer<T, PARAM, METHOD
         public B setSkipMethodParameter(
                 Predicate<Map<DotName, AnnotationInstance>> skipMethodParameter) {
             this.skipMethodParameter = skipMethodParameter;
+            return (B) this;
+        }
+
+        public B setValidateEndpoint(List<Predicate<ClassInfo>> validateEndpoint) {
+            List<Predicate<ClassInfo>> predicates = new ArrayList<>(validateEndpoint.size() + 1);
+            predicates.addAll(validateEndpoint);
+            predicates.addAll(this.defaultPredicate);
+            this.defaultPredicate = predicates;
             return (B) this;
         }
 

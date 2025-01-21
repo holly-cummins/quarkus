@@ -27,7 +27,6 @@ import jakarta.inject.Singleton;
 
 import org.jboss.jandex.AnnotationInstance;
 import org.jboss.jandex.AnnotationTarget;
-import org.jboss.jandex.AnnotationTransformation;
 import org.jboss.jandex.ClassInfo;
 import org.jboss.jandex.DotName;
 import org.jboss.jandex.IndexView;
@@ -37,9 +36,7 @@ import org.jboss.jandex.Type;
 import org.jboss.jandex.TypeVariable;
 import org.objectweb.asm.Opcodes;
 
-import io.quarkus.arc.DefaultBean;
 import io.quarkus.arc.deployment.AdditionalBeanBuildItem;
-import io.quarkus.arc.deployment.AnnotationsTransformerBuildItem;
 import io.quarkus.arc.deployment.BeanContainerBuildItem;
 import io.quarkus.arc.deployment.BeanRegistrationPhaseBuildItem;
 import io.quarkus.arc.deployment.GeneratedBeanBuildItem;
@@ -95,6 +92,7 @@ public class HttpSecurityProcessor {
     private static final DotName AUTH_MECHANISM_NAME = DotName.createSimple(HttpAuthenticationMechanism.class);
     private static final DotName BASIC_AUTH_MECH_NAME = DotName.createSimple(BasicAuthenticationMechanism.class);
     private static final DotName BASIC_AUTH_ANNOTATION_NAME = DotName.createSimple(BasicAuthentication.class);
+    private static final String KOTLIN_SUSPEND_IMPL_SUFFIX = "$suspendImpl";
 
     @Record(ExecutionTime.STATIC_INIT)
     @BuildStep
@@ -186,23 +184,28 @@ public class HttpSecurityProcessor {
     }
 
     @BuildStep(onlyIf = IsApplicationBasicAuthRequired.class)
-    AdditionalBeanBuildItem initBasicAuth(HttpBuildTimeConfig buildTimeConfig,
-            BuildProducer<AnnotationsTransformerBuildItem> annotationsTransformerProducer,
+    @Record(ExecutionTime.RUNTIME_INIT)
+    SyntheticBeanBuildItem initBasicAuth(HttpSecurityRecorder recorder,
+            HttpConfiguration runtimeConfig,
+            HttpBuildTimeConfig buildTimeConfig,
             BuildProducer<SecurityInformationBuildItem> securityInformationProducer) {
-
-        if (makeBasicAuthMechDefaultBean(buildTimeConfig)) {
-            //if not explicitly enabled we make this a default bean, so it is the fallback if nothing else is defined
-            annotationsTransformerProducer.produce(new AnnotationsTransformerBuildItem(AnnotationTransformation
-                    .forClasses()
-                    .whenClass(BASIC_AUTH_MECH_NAME)
-                    .transform(ctx -> ctx.add(DefaultBean.class))));
-        }
 
         if (buildTimeConfig.auth.basic.isPresent() && buildTimeConfig.auth.basic.get()) {
             securityInformationProducer.produce(SecurityInformationBuildItem.BASIC());
         }
 
-        return AdditionalBeanBuildItem.builder().setUnremovable().addBeanClass(BasicAuthenticationMechanism.class).build();
+        SyntheticBeanBuildItem.ExtendedBeanConfigurator configurator = SyntheticBeanBuildItem
+                .configure(BasicAuthenticationMechanism.class)
+                .types(io.quarkus.vertx.http.runtime.security.HttpAuthenticationMechanism.class)
+                .scope(Singleton.class)
+                .supplier(recorder.basicAuthenticationMechanismBean(runtimeConfig, buildTimeConfig.auth.form.enabled))
+                .setRuntimeInit()
+                .unremovable();
+        if (makeBasicAuthMechDefaultBean(buildTimeConfig)) {
+            configurator.defaultBean();
+        }
+
+        return configurator.done();
     }
 
     private static boolean makeBasicAuthMechDefaultBean(HttpBuildTimeConfig buildTimeConfig) {
@@ -576,9 +579,16 @@ public class HttpSecurityProcessor {
         if (target.kind() == AnnotationTarget.Kind.METHOD) {
             var method = target.asMethod();
             if (!hasProperEndpointModifiers(method)) {
+                if (method.isSynthetic() && method.name().endsWith(KOTLIN_SUSPEND_IMPL_SUFFIX)) {
+                    // ATM there are 2 methods for Kotlin endpoint like this:
+                    // @AuthorizationPolicy(name = "suspended")
+                    // suspend fun sayHi() = "Hi"
+                    // the synthetic method doesn't need to be secured, but it keeps security annotations
+                    return Stream.empty();
+                }
                 throw new RuntimeException("""
                         Found method annotated with the @AuthorizationPolicy annotation that is not an endpoint: %s#%s
-                        """.formatted(method.asClass().name().toString(), method.name()));
+                        """.formatted(method.declaringClass().name().toString(), method.name()));
             }
             return Stream.of(method);
         }

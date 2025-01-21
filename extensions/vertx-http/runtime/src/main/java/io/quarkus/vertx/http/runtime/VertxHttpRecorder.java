@@ -279,8 +279,12 @@ public class VertxHttpRecorder {
             ManagementInterfaceConfiguration managementConfig = new ManagementInterfaceConfiguration();
             ConfigInstantiator.handleObject(managementConfig);
             if (httpConfiguration.host == null) {
-                //HttpHostConfigSource does not come into play here
+                //VertxConfigBuilder does not come into play here
                 httpConfiguration.host = "localhost";
+            }
+            if (managementConfig.host == null) {
+                //VertxConfigBuilder does not come into play here
+                managementConfig.host = "localhost";
             }
             Router router = Router.router(vertx);
             if (hotReplacementHandler != null) {
@@ -292,7 +296,7 @@ public class VertxHttpRecorder {
             if (liveReloadConfig.password().isPresent()
                     && hotReplacementContext.getDevModeType() == DevModeType.REMOTE_SERVER_SIDE) {
                 root = remoteSyncHandler = new RemoteSyncHandler(liveReloadConfig.password().get(), root,
-                        hotReplacementContext);
+                        hotReplacementContext, "/");
             }
             rootHandler = root;
 
@@ -475,7 +479,7 @@ public class VertxHttpRecorder {
 
         boolean quarkusWrapperNeeded = false;
 
-        if (shutdownConfig.isShutdownTimeoutSet()) {
+        if (shutdownConfig.isTimeoutEnabled()) {
             gracefulShutdownFilter.next(root);
             root = gracefulShutdownFilter;
             quarkusWrapperNeeded = true;
@@ -530,8 +534,9 @@ public class VertxHttpRecorder {
             };
         }
 
+        final boolean mustResumeRequest = httpConfiguration.limits.maxBodySize.isPresent();
         Handler<HttpServerRequest> delegate = root;
-        root = HttpServerCommonHandlers.enforceDuplicatedContext(delegate);
+        root = HttpServerCommonHandlers.enforceDuplicatedContext(delegate, mustResumeRequest);
         if (httpConfiguration.recordRequestStartTime) {
             httpRouteRouter.route().order(RouteConstants.ROUTE_ORDER_RECORD_START_TIME).handler(new Handler<RoutingContext>() {
                 @Override
@@ -543,7 +548,8 @@ public class VertxHttpRecorder {
         }
         if (launchMode == LaunchMode.DEVELOPMENT && liveReloadConfig.password().isPresent()
                 && hotReplacementContext.getDevModeType() == DevModeType.REMOTE_SERVER_SIDE) {
-            root = remoteSyncHandler = new RemoteSyncHandler(liveReloadConfig.password().get(), root, hotReplacementContext);
+            root = remoteSyncHandler = new RemoteSyncHandler(liveReloadConfig.password().get(), root, hotReplacementContext,
+                    rootPath);
         }
         rootHandler = root;
 
@@ -571,7 +577,7 @@ public class VertxHttpRecorder {
             HttpServerCommonHandlers.applyHeaders(managementConfiguration.getValue().header, mr);
             applyCompression(managementBuildTimeConfig.enableCompression, mr);
 
-            Handler<HttpServerRequest> handler = HttpServerCommonHandlers.enforceDuplicatedContext(mr);
+            Handler<HttpServerRequest> handler = HttpServerCommonHandlers.enforceDuplicatedContext(mr, mustResumeRequest);
             handler = HttpServerCommonHandlers.applyProxy(managementConfiguration.getValue().proxy, handler, vertx);
 
             int routesBeforeMiEvent = mr.getRoutes().size();

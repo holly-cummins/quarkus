@@ -189,13 +189,16 @@ final class OidcTenantConfigImpl implements OidcTenantConfig {
         TOKEN_ALLOW_OPAQUE_TOKEN_INTROSPECTION,
         TOKEN_CUSTOMIZER_NAME,
         TOKEN_VERIFY_ACCESS_TOKEN_WITH_USER_INFO,
+        TOKEN_BINDING,
+        TOKEN_BINDING_CERTIFICATE,
         ROLES_ROLE_CLAIM_PATH,
         ROLES_ROLE_CLAIM_SEPARATOR,
         ROLES_SOURCE,
         INTROSPECTION_CREDENTIALS_NAME,
         INTROSPECTION_CREDENTIALS_SECRET,
         INTROSPECTION_CREDENTIALS_INCLUDE_CLIENT_ID,
-        TENANT_ID
+        TENANT_ID,
+        JWT_BEARER_TOKEN_PATH
     }
 
     final Map<ConfigMappingMethods, Boolean> invocationsRecorder = new EnumMap<>(ConfigMappingMethods.class);
@@ -436,6 +439,18 @@ final class OidcTenantConfigImpl implements OidcTenantConfig {
             public Optional<Boolean> verifyAccessTokenWithUserInfo() {
                 invocationsRecorder.put(ConfigMappingMethods.TOKEN_VERIFY_ACCESS_TOKEN_WITH_USER_INFO, true);
                 return Optional.empty();
+            }
+
+            @Override
+            public Binding binding() {
+                invocationsRecorder.put(ConfigMappingMethods.TOKEN_BINDING, true);
+                return new Binding() {
+                    @Override
+                    public boolean certificate() {
+                        invocationsRecorder.put(ConfigMappingMethods.TOKEN_BINDING_CERTIFICATE, true);
+                        return false;
+                    }
+                };
             }
         };
     }
@@ -947,6 +962,12 @@ final class OidcTenantConfigImpl implements OidcTenantConfig {
                     public Source source() {
                         invocationsRecorder.put(ConfigMappingMethods.CREDENTIALS_JWT_SOURCE, true);
                         return Source.BEARER;
+                    }
+
+                    @Override
+                    public Optional<Path> tokenPath() {
+                        invocationsRecorder.put(ConfigMappingMethods.JWT_BEARER_TOKEN_PATH, true);
+                        return Optional.empty();
                     }
 
                     @Override

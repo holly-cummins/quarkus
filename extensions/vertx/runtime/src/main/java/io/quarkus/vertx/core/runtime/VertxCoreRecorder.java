@@ -15,8 +15,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Random;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CountDownLatch;
@@ -68,6 +68,8 @@ import io.vertx.core.spi.resolver.ResolverProvider;
 
 @Recorder
 public class VertxCoreRecorder {
+
+    private static final String LOGGER_FACTORY_NAME_SYS_PROP = "vertx.logger-delegate-factory-class-name";
 
     static {
         System.setProperty("vertx.disableTCCL", "true");
@@ -395,8 +397,7 @@ public class VertxCoreRecorder {
     }
 
     private static File getRandomDirectory(File tmp) {
-        long random = Math.abs(UUID.randomUUID().getMostSignificantBits());
-        File cache = new File(tmp, Long.toString(random));
+        File cache = new File(tmp, Long.toString(new Random().nextLong()));
         if (cache.isDirectory()) {
             // Do not reuse an existing directory.
             return getRandomDirectory(tmp);
@@ -665,6 +666,13 @@ public class VertxCoreRecorder {
     public static Supplier<Vertx> recoverFailedStart(VertxConfiguration config, ThreadPoolConfig threadPoolConfig) {
         return vertx = new VertxSupplier(LaunchMode.DEVELOPMENT, config, Collections.emptyList(), threadPoolConfig, null);
 
+    }
+
+    public void configureQuarkusLoggerFactory() {
+        String loggerClassName = System.getProperty(LOGGER_FACTORY_NAME_SYS_PROP);
+        if (loggerClassName == null) {
+            System.setProperty(LOGGER_FACTORY_NAME_SYS_PROP, VertxLogDelegateFactory.class.getName());
+        }
     }
 
     static class VertxSupplier implements Supplier<Vertx> {

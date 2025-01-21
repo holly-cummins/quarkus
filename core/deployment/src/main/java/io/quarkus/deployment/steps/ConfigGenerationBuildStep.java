@@ -27,12 +27,17 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
-import org.eclipse.microprofile.config.Config;
+import jakarta.annotation.Priority;
+
 import org.eclipse.microprofile.config.ConfigProvider;
-import org.eclipse.microprofile.config.ConfigValue;
 import org.eclipse.microprofile.config.spi.ConfigSource;
 import org.eclipse.microprofile.config.spi.ConfigSourceProvider;
 import org.eclipse.microprofile.config.spi.Converter;
+import org.jboss.jandex.AnnotationInstance;
+import org.jboss.jandex.ClassInfo;
+import org.jboss.jandex.DotName;
+import org.jboss.jandex.ParameterizedType;
+import org.jboss.jandex.Type;
 import org.objectweb.asm.Opcodes;
 
 import io.quarkus.bootstrap.classloading.QuarkusClassLoader;
@@ -92,6 +97,7 @@ import io.smallrye.config.ConfigMappings.ConfigClass;
 import io.smallrye.config.ConfigSourceFactory;
 import io.smallrye.config.ConfigSourceInterceptor;
 import io.smallrye.config.ConfigSourceInterceptorFactory;
+import io.smallrye.config.ConfigValue;
 import io.smallrye.config.DefaultValuesConfigSource;
 import io.smallrye.config.ProfileConfigSourceInterceptor;
 import io.smallrye.config.SecretKeysHandler;
@@ -132,8 +138,8 @@ public class ConfigGenerationBuildStep {
 
             ResultHandle map = clinit.newInstance(MethodDescriptor.ofConstructor(HashMap.class));
             MethodDescriptor put = MethodDescriptor.ofMethod(Map.class, "put", Object.class, Object.class, Object.class);
-            for (Map.Entry<String, String> entry : configItem.getReadResult().getBuildTimeRunTimeValues().entrySet()) {
-                clinit.invokeInterfaceMethod(put, map, clinit.load(entry.getKey()), clinit.load(entry.getValue()));
+            for (Map.Entry<String, ConfigValue> entry : configItem.getReadResult().getBuildTimeRunTimeValues().entrySet()) {
+                clinit.invokeInterfaceMethod(put, map, clinit.load(entry.getKey()), clinit.load(entry.getValue().getValue()));
             }
 
             ResultHandle defaultValuesSource = clinit.newInstance(
@@ -200,6 +206,7 @@ public class ConfigGenerationBuildStep {
     @BuildStep
     void generateBuilders(
             ConfigurationBuildItem configItem,
+            CombinedIndexBuildItem combinedIndex,
             List<ConfigMappingBuildItem> configMappings,
             List<RunTimeConfigurationDefaultBuildItem> runTimeDefaults,
             List<StaticInitConfigBuilderBuildItem> staticInitConfigBuilders,
@@ -209,14 +216,20 @@ public class ConfigGenerationBuildStep {
 
         Map<String, String> defaultValues = new HashMap<>();
         // Default values from @ConfigRoot
-        defaultValues.putAll(configItem.getReadResult().getRunTimeDefaultValues());
+        for (Map.Entry<String, ConfigValue> entry : configItem.getReadResult().getRunTimeDefaultValues().entrySet()) {
+            defaultValues.put(entry.getKey(), entry.getValue().getRawValue());
+        }
         // Default values from build item RunTimeConfigurationDefaultBuildItem override
         for (RunTimeConfigurationDefaultBuildItem e : runTimeDefaults) {
             defaultValues.put(e.getKey(), e.getValue());
         }
         // Recorded values from build time from any other source (higher ordinal then defaults, so override)
-        List<String> profiles = ConfigProvider.getConfig().unwrap(SmallRyeConfig.class).getProfiles();
-        for (Map.Entry<String, String> entry : configItem.getReadResult().getRunTimeValues().entrySet()) {
+        SmallRyeConfig config = ConfigProvider.getConfig().unwrap(SmallRyeConfig.class);
+        List<String> profiles = config.getProfiles();
+        for (Map.Entry<String, ConfigValue> entry : configItem.getReadResult().getRunTimeValues().entrySet()) {
+            if (DefaultValuesConfigSource.NAME.equals(entry.getValue().getConfigSourceName())) {
+                continue;
+            }
             // Runtime values may contain active profiled names that override sames names in defaults
             // We need to keep the original name definition in case a different profile is used to run the app
             String activeName = ProfileConfigSourceInterceptor.activeName(entry.getKey(), profiles);
@@ -224,9 +237,8 @@ public class ConfigGenerationBuildStep {
             if (!configItem.getReadResult().getRunTimeDefaultValues().containsKey(activeName)) {
                 defaultValues.remove(activeName);
             }
-            defaultValues.put(entry.getKey(), entry.getValue());
+            defaultValues.put(entry.getKey(), entry.getValue().getRawValue());
         }
-        defaultValues.putAll(configItem.getReadResult().getRunTimeValues());
 
         Set<String> converters = discoverService(Converter.class, reflectiveClass);
         Set<String> interceptors = discoverService(ConfigSourceInterceptor.class, reflectiveClass);
@@ -246,6 +258,7 @@ public class ConfigGenerationBuildStep {
         staticCustomizers.add(StaticInitConfigBuilder.class.getName());
 
         generateConfigBuilder(generatedClass, reflectiveClass, CONFIG_STATIC_NAME,
+                combinedIndex,
                 defaultValues,
                 converters,
                 interceptors,
@@ -269,6 +282,7 @@ public class ConfigGenerationBuildStep {
         runtimeCustomizers.add(RuntimeConfigBuilder.class.getName());
 
         generateConfigBuilder(generatedClass, reflectiveClass, CONFIG_RUNTIME_NAME,
+                combinedIndex,
                 defaultValues,
                 converters,
                 interceptors,
@@ -322,7 +336,6 @@ public class ConfigGenerationBuildStep {
     public void suppressNonRuntimeConfigChanged(
             BuildProducer<SuppressNonRuntimeConfigChangedWarningBuildItem> suppressNonRuntimeConfigChanged) {
         suppressNonRuntimeConfigChanged.produce(new SuppressNonRuntimeConfigChangedWarningBuildItem("quarkus.profile"));
-        suppressNonRuntimeConfigChanged.produce(new SuppressNonRuntimeConfigChangedWarningBuildItem("quarkus.uuid"));
         suppressNonRuntimeConfigChanged.produce(new SuppressNonRuntimeConfigChangedWarningBuildItem("quarkus.default-locale"));
         suppressNonRuntimeConfigChanged.produce(new SuppressNonRuntimeConfigChangedWarningBuildItem("quarkus.locales"));
         suppressNonRuntimeConfigChanged.produce(new SuppressNonRuntimeConfigChangedWarningBuildItem("quarkus.test.arg-line"));
@@ -349,28 +362,25 @@ public class ConfigGenerationBuildStep {
         recorderContext.registerSubstitution(io.smallrye.config.ConfigValue.class, QuarkusConfigValue.class,
                 QuarkusConfigValue.Substitution.class);
 
-        BuildTimeConfigurationReader.ReadResult readResult = configItem.getReadResult();
-        Config config = ConfigProvider.getConfig();
-
         Set<String> excludedConfigKeys = new HashSet<>(suppressNonRuntimeConfigChangedWarningItems.size());
         for (SuppressNonRuntimeConfigChangedWarningBuildItem item : suppressNonRuntimeConfigChangedWarningItems) {
             excludedConfigKeys.add(item.getConfigKey());
         }
 
         Map<String, ConfigValue> values = new HashMap<>();
-
-        for (final Map.Entry<String, String> entry : readResult.getAllBuildTimeValues().entrySet()) {
+        BuildTimeConfigurationReader.ReadResult readResult = configItem.getReadResult();
+        for (final Map.Entry<String, ConfigValue> entry : readResult.getAllBuildTimeValues().entrySet()) {
             if (excludedConfigKeys.contains(entry.getKey())) {
                 continue;
             }
-            values.putIfAbsent(entry.getKey(), config.getConfigValue(entry.getKey()));
+            values.putIfAbsent(entry.getKey(), entry.getValue());
         }
 
-        for (Map.Entry<String, String> entry : readResult.getBuildTimeRunTimeValues().entrySet()) {
+        for (Map.Entry<String, ConfigValue> entry : readResult.getBuildTimeRunTimeValues().entrySet()) {
             if (excludedConfigKeys.contains(entry.getKey())) {
                 continue;
             }
-            values.put(entry.getKey(), config.getConfigValue(entry.getKey()));
+            values.put(entry.getKey(), entry.getValue());
         }
 
         recorder.handleConfigChange(values);
@@ -520,7 +530,7 @@ public class ConfigGenerationBuildStep {
             "withDefaultValue",
             void.class, SmallRyeConfigBuilder.class, String.class, String.class);
     private static final MethodDescriptor WITH_CONVERTER = MethodDescriptor.ofMethod(AbstractConfigBuilder.class,
-            "withConverter", void.class, SmallRyeConfigBuilder.class, Converter.class);
+            "withConverter", void.class, SmallRyeConfigBuilder.class, String.class, int.class, Converter.class);
     private static final MethodDescriptor WITH_INTERCEPTOR = MethodDescriptor.ofMethod(AbstractConfigBuilder.class,
             "withInterceptor",
             void.class, SmallRyeConfigBuilder.class, ConfigSourceInterceptor.class);
@@ -549,17 +559,15 @@ public class ConfigGenerationBuildStep {
     private static final MethodDescriptor WITH_BUILDER = MethodDescriptor.ofMethod(AbstractConfigBuilder.class,
             "withBuilder",
             void.class, SmallRyeConfigBuilder.class, ConfigBuilder.class);
-    private static final MethodDescriptor WITH_NAMES = MethodDescriptor.ofMethod(SmallRyeConfigBuilder.class,
-            "withMappingNames",
-            SmallRyeConfigBuilder.class, Map.class);
-    private static final MethodDescriptor WITH_KEYS = MethodDescriptor.ofMethod(SmallRyeConfigBuilder.class,
-            "withMappingKeys",
-            SmallRyeConfigBuilder.class, Set.class);
+
+    private static final DotName CONVERTER_NAME = DotName.createSimple(Converter.class.getName());
+    private static final DotName PRIORITY_NAME = DotName.createSimple(Priority.class.getName());
 
     private static void generateConfigBuilder(
             BuildProducer<GeneratedClassBuildItem> generatedClass,
             BuildProducer<ReflectiveClassBuildItem> reflectiveClass,
             String className,
+            CombinedIndexBuildItem combinedIndex,
             Map<String, String> defaultValues,
             Set<String> converters,
             Set<String> interceptors,
@@ -591,7 +599,13 @@ public class ConfigGenerationBuildStep {
             }
 
             for (String converter : converters) {
+                ClassInfo converterClass = combinedIndex.getComputingIndex().getClassByName(converter);
+                Type type = getConverterType(converterClass, combinedIndex);
+                AnnotationInstance priorityAnnotation = converterClass.annotation(PRIORITY_NAME);
+                int priority = priorityAnnotation != null ? priorityAnnotation.value().asInt() : 100;
                 method.invokeStaticMethod(WITH_CONVERTER, configBuilder,
+                        method.load(type.name().toString()),
+                        method.load(priority),
                         method.newInstance(MethodDescriptor.ofConstructor(converter)));
             }
 
@@ -715,5 +729,28 @@ public class ConfigGenerationBuildStep {
         return configMappings.stream()
                 .map(ConfigMappingBuildItem::toConfigClass)
                 .collect(toSet());
+    }
+
+    private static Type getConverterType(final ClassInfo converter, final CombinedIndexBuildItem combinedIndex) {
+        if (converter.name().toString().equals(Object.class.getName())) {
+            throw new IllegalArgumentException(
+                    "Can not add converter " + converter.name() + " that is not parameterized with a type");
+        }
+
+        for (Type type : converter.interfaceTypes()) {
+            if (type instanceof ParameterizedType) {
+                ParameterizedType parameterizedType = type.asParameterizedType();
+                if (parameterizedType.name().equals(CONVERTER_NAME)) {
+                    List<Type> arguments = parameterizedType.arguments();
+                    if (arguments.size() != 1) {
+                        throw new IllegalArgumentException(
+                                "Converter " + converter.name() + " must be parameterized with a single type");
+                    }
+                    return arguments.get(0);
+                }
+            }
+        }
+
+        return getConverterType(combinedIndex.getComputingIndex().getClassByName(converter.superName()), combinedIndex);
     }
 }

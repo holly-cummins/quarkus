@@ -15,7 +15,7 @@ import io.smallrye.mutiny.Uni;
  * Adds a permission checker that grants access to the {@link QuarkusPermission}
  * when {@link QuarkusPermission#isGranted(SecurityIdentity)} is true.
  */
-final class QuarkusPermissionSecurityIdentityAugmentor implements SecurityIdentityAugmentor {
+public final class QuarkusPermissionSecurityIdentityAugmentor implements SecurityIdentityAugmentor {
 
     /**
      * Permission checker only authorizes authenticated users and checkers shouldn't throw a security exception.
@@ -60,5 +60,11 @@ final class QuarkusPermissionSecurityIdentityAugmentor implements SecurityIdenti
                     }
                 })
                 .build());
+    }
+
+    @Override
+    public int priority() {
+        // we do not rely on this value and always add this augmentor as the last one manually
+        return Integer.MAX_VALUE;
     }
 }

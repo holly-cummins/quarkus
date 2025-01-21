@@ -252,6 +252,7 @@ If you have not done so on this machine, you need to:
   * Windows:
     * enable longpaths: `git config --global core.longpaths true`
     * avoid CRLF breaks: `git config --global core.autocrlf false`
+    * enable symlinks: `git config --global core.symlinks true`
 * Install Java SDK 17+ (OpenJDK recommended)
 * Install [GraalVM](https://quarkus.io/guides/building-native-image)
 * Install platform C developer tools:
@@ -461,6 +462,14 @@ alias qss="java -jar ${HOME}/git/quarkus/devtools/cli/target/quarkus-cli-999-SNA
 
 Using `./mvnw` is often not practical in this case as you might want to call these aliases from a nested directory.
 [gum](https://andresalmiray.com/gum-the-gradle-maven-wrapper/) might be useful in this case.
+
+##### Justfile
+
+As a convenience, we have a [justfile](.justfile)) that provides the suggested set of aliases to use to build Quarkus using [just](https://just.systems/).
+
+Run `just -l` to see the list of aliases.
+
+By default it uses `./mvnw`. If you use `mvnd` you can set the `QMVNCMD` environment variable to `mvnd` to use it instead.
 
 #### Building all modules of an extension
 
@@ -872,10 +881,6 @@ This project is an open source project, please act responsibly, be nice, polite 
   claiming `java.lang.OutOfMemoryError: GC overhead limit exceeded` that means the project import failed.
 
   See section `IDEA Setup` as there are different possible solutions described.
-
-* IntelliJ does not recognize the project as a Java 17 project
-
-  In the Maven pane, uncheck the `include-jdk-misc` and `compile-java8-release-flag` profiles
 
 * Build hangs with DevMojoIT running infinitely
 

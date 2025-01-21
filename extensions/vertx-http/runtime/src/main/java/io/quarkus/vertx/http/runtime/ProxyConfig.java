@@ -35,7 +35,7 @@ public class ProxyConfig {
      * the precedence.
      * Activating this together with {@code quarkus.http.proxy.allow-x-forwarded} has security implications as clients can forge
      * requests with a forwarded header that is not overwritten by the proxy. Therefore, proxies should strip unexpected
-     * `X-Forwarded` or `X-Forwarded-*` headers from the client.
+     * `Forwarded` or `X-Forwarded-*` headers from the client.
      */
     @ConfigItem
     public boolean allowForwarded;
@@ -47,10 +47,39 @@ public class ProxyConfig {
      * precedence.
      * Activating this together with {@code quarkus.http.proxy.allow-forwarded} has security implications as clients can forge
      * requests with a forwarded header that is not overwritten by the proxy. Therefore, proxies should strip unexpected
-     * `X-Forwarded` or `X-Forwarded-*` headers from the client.
+     * `Forwarded` or `X-Forwarded-*` headers from the client.
      */
     @ConfigItem
     public Optional<Boolean> allowXForwarded;
+
+    /**
+     * When both Forwarded and X-Forwarded headers are enabled with {@link #allowForwarded} and {@link #allowXForwarded}
+     * respectively, enforce that the identical headers must have equal values.
+     */
+    @ConfigItem(defaultValue = "true")
+    public boolean strictForwardedControl;
+
+    /**
+     * Precedence of Forwarded and X-Forwarded headers when both types of headers are enabled and no strict forwarded control is
+     * enforced.
+     */
+    public enum ForwardedPrecedence {
+        FORWARDED,
+        X_FORWARDED
+    }
+
+    /**
+     * When both Forwarded and X-Forwarded headers are enabled with {@link #allowForwarded} and {@link #allowXForwarded}
+     * respectively, and {@link #strictForwardedControl} enforcing that the identical headers must have equal values is
+     * disabled,
+     * choose if it is Forwarded or X-Forwarded matching header value that is preferred.
+     * <p>
+     * For example, if Forwarded has a precedence over X-Forwarded, Forwarded scheme is `http` and X-Forwarded scheme is
+     * `https`,
+     * then the final scheme value is `http`. If X-Forwarded has a precedence, then the final scheme value is 'https'.
+     */
+    @ConfigItem(defaultValue = "forwarded")
+    public ForwardedPrecedence forwardedPrecedence;
 
     /**
      * Enable override the received request's host through a forwarded host header.

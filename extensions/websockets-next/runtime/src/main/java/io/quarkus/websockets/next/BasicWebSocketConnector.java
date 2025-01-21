@@ -10,7 +10,6 @@ import jakarta.enterprise.inject.Instance;
 
 import io.quarkus.arc.Arc;
 import io.smallrye.common.annotation.CheckReturnValue;
-import io.smallrye.common.annotation.Experimental;
 import io.smallrye.mutiny.Uni;
 import io.vertx.core.buffer.Buffer;
 
@@ -42,7 +41,6 @@ import io.vertx.core.buffer.Buffer;
  *
  * @see WebSocketClientConnection
  */
-@Experimental("This API is experimental and may change in the future")
 public interface BasicWebSocketConnector {
 
     /**
@@ -157,6 +155,15 @@ public interface BasicWebSocketConnector {
      * @see #executionModel(ExecutionModel)
      */
     BasicWebSocketConnector onBinaryMessage(BiConsumer<WebSocketClientConnection, Buffer> consumer);
+
+    /**
+     * Set a callback to be invoked when a ping message is received from the server.
+     *
+     * @param consumer
+     * @return self
+     * @see #executionModel(ExecutionModel)
+     */
+    BasicWebSocketConnector onPing(BiConsumer<WebSocketClientConnection, Buffer> consumer);
 
     /**
      * Set a callback to be invoked when a pong message is received from the server.

@@ -191,6 +191,7 @@ import io.quarkus.resteasy.reactive.server.runtime.security.SecurityContextOverr
 import io.quarkus.resteasy.reactive.server.spi.AllowNotRestParametersBuildItem;
 import io.quarkus.resteasy.reactive.server.spi.AnnotationsTransformerBuildItem;
 import io.quarkus.resteasy.reactive.server.spi.ContextTypeBuildItem;
+import io.quarkus.resteasy.reactive.server.spi.GlobalHandlerCustomizerBuildItem;
 import io.quarkus.resteasy.reactive.server.spi.HandlerConfigurationProviderBuildItem;
 import io.quarkus.resteasy.reactive.server.spi.MethodScannerBuildItem;
 import io.quarkus.resteasy.reactive.server.spi.NonBlockingReturnTypeBuildItem;
@@ -198,6 +199,7 @@ import io.quarkus.resteasy.reactive.server.spi.PreExceptionMapperHandlerBuildIte
 import io.quarkus.resteasy.reactive.server.spi.ResumeOn404BuildItem;
 import io.quarkus.resteasy.reactive.spi.CustomExceptionMapperBuildItem;
 import io.quarkus.resteasy.reactive.spi.DynamicFeatureBuildItem;
+import io.quarkus.resteasy.reactive.spi.EndpointValidationPredicatesBuildItem;
 import io.quarkus.resteasy.reactive.spi.ExceptionMapperBuildItem;
 import io.quarkus.resteasy.reactive.spi.JaxrsFeatureBuildItem;
 import io.quarkus.resteasy.reactive.spi.MessageBodyReaderBuildItem;
@@ -468,7 +470,8 @@ public class ResteasyReactiveProcessor {
             CompiledJavaVersionBuildItem compiledJavaVersionBuildItem,
             ResourceInterceptorsBuildItem resourceInterceptorsBuildItem,
             Capabilities capabilities,
-            Optional<AllowNotRestParametersBuildItem> allowNotRestParametersBuildItem) {
+            Optional<AllowNotRestParametersBuildItem> allowNotRestParametersBuildItem,
+            List<EndpointValidationPredicatesBuildItem> validationPredicatesBuildItems) {
 
         if (!resourceScanningResultBuildItem.isPresent()) {
             // no detected @Path, bail out
@@ -640,6 +643,8 @@ public class ResteasyReactiveProcessor {
                     })
                     .setResteasyReactiveRecorder(recorder)
                     .setApplicationClassPredicate(applicationClassPredicate)
+                    .setValidateEndpoint(validationPredicatesBuildItems.stream().map(item -> item.getPredicate())
+                            .collect(Collectors.toUnmodifiableList()))
                     .setTargetJavaVersion(new TargetJavaVersion() {
 
                         private final Status result;
@@ -1210,7 +1215,14 @@ public class ResteasyReactiveProcessor {
 
         // when a ContainerResponseFilter exists, it can potentially do responseContext.setEntityStream()
         // which then forces the use of the slow path for calling writers
-        if (!resourceInterceptorsBuildItem.getResourceInterceptors().getContainerResponseFilters().isEmpty()) {
+        ResourceInterceptors resourceInterceptors = resourceInterceptorsBuildItem.getResourceInterceptors();
+        if (!resourceInterceptors.getContainerResponseFilters().isEmpty()) {
+            serializersRequireResourceReflection = true;
+        }
+        // when ReaderInterceptor or WriterInterceptor is used, we need to access to the Method
+        // because of InterceptorContext
+        if (!(resourceInterceptors.getReaderInterceptors().isEmpty()
+                && resourceInterceptors.getWriterInterceptors().isEmpty())) {
             serializersRequireResourceReflection = true;
         }
 
@@ -1223,6 +1235,11 @@ public class ResteasyReactiveProcessor {
                     .reason(getClass().getName())
                     .constructors(false).methods().build());
         }
+    }
+
+    @BuildStep
+    public GlobalHandlerCustomizerBuildItem securityContextOverrideHandler() {
+        return new GlobalHandlerCustomizerBuildItem(new SecurityContextOverrideHandler.Customizer());
     }
 
     @BuildStep
@@ -1253,7 +1270,8 @@ public class ResteasyReactiveProcessor {
             ContextResolversBuildItem contextResolversBuildItem,
             ResteasyReactiveServerConfig serverConfig,
             LaunchModeBuildItem launchModeBuildItem,
-            List<ResumeOn404BuildItem> resumeOn404Items)
+            List<ResumeOn404BuildItem> resumeOn404Items,
+            List<GlobalHandlerCustomizerBuildItem> globalHandlerCustomizers)
             throws NoSuchMethodException {
 
         if (!resourceScanningResultBuildItem.isPresent()) {
@@ -1354,7 +1372,8 @@ public class ResteasyReactiveProcessor {
                 .setSerialisers(serialisers)
                 .setPreExceptionMapperHandler(determinePreExceptionMapperHandler(preExceptionMapperHandlerBuildItems))
                 .setApplicationPath(applicationPath)
-                .setGlobalHandlerCustomizers(Collections.singletonList(new SecurityContextOverrideHandler.Customizer())) //TODO: should be pluggable
+                .setGlobalHandlerCustomizers(globalHandlerCustomizers.stream().map(
+                        GlobalHandlerCustomizerBuildItem::getCustomizer).toList())
                 .setResourceClasses(resourceClasses)
                 .setDevelopmentMode(launchModeBuildItem.getLaunchMode() == LaunchMode.DEVELOPMENT)
                 .setLocatableResourceClasses(subResourceClasses)

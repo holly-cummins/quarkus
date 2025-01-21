@@ -1,7 +1,5 @@
 package io.quarkus.oidc.client.registration.deployment.devservices.keycloak;
 
-import static io.quarkus.devservices.keycloak.KeycloakDevServicesRequiredBuildItem.OIDC_AUTH_SERVER_URL_CONFIG_KEY;
-
 import java.util.List;
 import java.util.Map;
 
@@ -14,7 +12,7 @@ import io.quarkus.deployment.IsDevelopment;
 import io.quarkus.deployment.IsNormal;
 import io.quarkus.deployment.annotations.BuildStep;
 import io.quarkus.deployment.annotations.BuildSteps;
-import io.quarkus.deployment.dev.devservices.GlobalDevServicesConfig;
+import io.quarkus.deployment.dev.devservices.DevServicesConfig;
 import io.quarkus.devservices.keycloak.KeycloakAdminPageBuildItem;
 import io.quarkus.devservices.keycloak.KeycloakDevServicesConfigurator;
 import io.quarkus.devservices.keycloak.KeycloakDevServicesRequiredBuildItem;
@@ -22,7 +20,7 @@ import io.quarkus.devui.spi.page.CardPageBuildItem;
 import io.quarkus.oidc.client.registration.deployment.OidcClientRegistrationBuildStep;
 
 @BuildSteps(onlyIfNot = IsNormal.class, onlyIf = { OidcClientRegistrationBuildStep.IsEnabled.class,
-        GlobalDevServicesConfig.Enabled.class })
+        DevServicesConfig.Enabled.class })
 public class KeycloakDevServiceRequiredBuildStep {
 
     private static final String OIDC_CLIENT_REG_AUTH_SERVER_URL_CONFIG_KEY = "quarkus.oidc-client-registration.auth-server-url";
@@ -55,8 +53,7 @@ public class KeycloakDevServiceRequiredBuildStep {
             }
         };
 
-        return KeycloakDevServicesRequiredBuildItem.of(devServicesConfigurator,
-                OIDC_CLIENT_REG_AUTH_SERVER_URL_CONFIG_KEY, OIDC_AUTH_SERVER_URL_CONFIG_KEY);
+        return KeycloakDevServicesRequiredBuildItem.of(devServicesConfigurator, OIDC_CLIENT_REG_AUTH_SERVER_URL_CONFIG_KEY);
     }
 
     @BuildStep(onlyIf = IsDevelopment.class)

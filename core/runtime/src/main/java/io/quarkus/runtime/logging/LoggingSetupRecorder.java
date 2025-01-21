@@ -33,6 +33,8 @@ import java.util.logging.LogRecord;
 import org.eclipse.microprofile.config.ConfigProvider;
 import org.eclipse.microprofile.config.spi.ConfigSource;
 import org.jboss.logmanager.ExtFormatter;
+import org.jboss.logmanager.ExtHandler;
+import org.jboss.logmanager.ExtLogRecord;
 import org.jboss.logmanager.LogContext;
 import org.jboss.logmanager.LogContextInitializer;
 import org.jboss.logmanager.Logger;
@@ -183,9 +185,9 @@ public class LoggingSetupRecorder {
             handlers.add(consoleHandler);
         }
         if (launchMode.isDevOrTest()) {
-            handlers.add(new Handler() {
+            handlers.add(new ExtHandler() {
                 @Override
-                public void publish(LogRecord record) {
+                protected void doPublish(ExtLogRecord record) {
                     if (record.getThrown() != null) {
                         ExceptionReporting.notifyException(record.getThrown());
                     }
@@ -259,7 +261,8 @@ public class LoggingSetupRecorder {
 
             namedHandlers.putAll(additionalNamedHandlersMap);
 
-            setUpCategoryLoggers(buildConfig, categoryDefaultMinLevels, categories, logContext, errorManager, namedHandlers);
+            setUpCategoryLoggers(buildConfig, categoryDefaultMinLevels, categories, logContext, errorManager, namedHandlers,
+                    true);
         }
 
         for (RuntimeValue<Optional<Handler>> additionalHandler : additionalHandlers) {
@@ -342,7 +345,7 @@ public class LoggingSetupRecorder {
                 emptyList(), emptyList(), emptyList(), emptyList(), errorManager, logCleanupFilter,
                 emptyMap(), launchMode, dummy, false);
 
-        setUpCategoryLoggers(buildConfig, categoryDefaultMinLevels, categories, logContext, errorManager, namedHandlers);
+        setUpCategoryLoggers(buildConfig, categoryDefaultMinLevels, categories, logContext, errorManager, namedHandlers, false);
 
         addNamedHandlersToRootHandlers(config.handlers(), namedHandlers, handlers, errorManager);
         InitialConfigurator.DELAYED_HANDLER.setAutoFlush(false);
@@ -480,7 +483,8 @@ public class LoggingSetupRecorder {
     private static void addNamedHandlersToCategory(
             CategoryConfig categoryConfig, Map<String, Handler> namedHandlers,
             Logger categoryLogger,
-            ErrorManager errorManager) {
+            ErrorManager errorManager,
+            boolean checkHandlerLinks) {
         for (String categoryNamedHandler : categoryConfig.handlers().get()) {
             Handler handler = namedHandlers.get(categoryNamedHandler);
             if (handler != null) {
@@ -491,7 +495,7 @@ public class LoggingSetupRecorder {
                         categoryLogger.removeHandler(handler);
                     }
                 });
-            } else {
+            } else if (checkHandlerLinks) {
                 errorManager.error(String.format("Handler with name '%s' is linked to a category but not configured.",
                         categoryNamedHandler), null, ErrorManager.GENERIC_FAILURE);
             }
@@ -504,7 +508,8 @@ public class LoggingSetupRecorder {
             final Map<String, CategoryConfig> categories,
             final LogContext logContext,
             final ErrorManager errorManager,
-            final Map<String, Handler> namedHandlers) {
+            final Map<String, Handler> namedHandlers,
+            final boolean checkHandlerLinks) {
 
         for (Entry<String, CategoryConfig> entry : categories.entrySet()) {
             String categoryName = entry.getKey();
@@ -530,7 +535,7 @@ public class LoggingSetupRecorder {
             }
             categoryLogger.setUseParentHandlers(categoryConfig.useParentHandlers());
             if (categoryConfig.handlers().isPresent()) {
-                addNamedHandlersToCategory(categoryConfig, namedHandlers, categoryLogger, errorManager);
+                addNamedHandlersToCategory(categoryConfig, namedHandlers, categoryLogger, errorManager, checkHandlerLinks);
             }
         }
     }
@@ -613,9 +618,9 @@ public class LoggingSetupRecorder {
 
         if (color && launchMode.isDevOrTest() && !config.async().enable()) {
             final Handler delegate = handler;
-            handler = new Handler() {
+            handler = new ExtHandler() {
                 @Override
-                public void publish(LogRecord record) {
+                protected void doPublish(ExtLogRecord record) {
                     BiConsumer<LogRecord, Consumer<LogRecord>> formatter = CurrentAppExceptionHighlighter.THROWABLE_FORMATTER;
                     if (formatter != null) {
                         formatter.accept(record, delegate::publish);
