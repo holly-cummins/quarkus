@@ -95,6 +95,7 @@ public class QuarkusAugmentor {
             throw new IllegalStateException("Quarkus applications require Java 17 or higher to build");
         }
         long start = System.nanoTime();
+        System.out.println("DUMMY LOGGING");
         log.debug("Beginning Quarkus augmentation");
         ClassLoader originalClassLoader = Thread.currentThread().getContextClassLoader();
         QuarkusBuildCloseablesBuildItem buildCloseables = new QuarkusBuildCloseablesBuildItem();
