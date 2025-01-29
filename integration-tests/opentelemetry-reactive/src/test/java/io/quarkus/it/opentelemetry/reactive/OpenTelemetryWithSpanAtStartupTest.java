@@ -59,6 +59,7 @@ public class OpenTelemetryWithSpanAtStartupTest {
 
         @PostConstruct
         void onStart() {
+            System.out.println("HOLLY OTEL startup bean post construct " + enabled);
             if (enabled) {
                 callWireMockClient();
             }
@@ -66,6 +67,7 @@ public class OpenTelemetryWithSpanAtStartupTest {
 
         @WithSpan
         public void callWireMockClient() {
+            System.out.println("HOLLY OTEL calling wiremock with a span");
             RestClientBuilder.newBuilder()
                     .baseUri(URI.create("http://localhost:" + WIREMOCK_PORT))
                     .build(WireMockRestClient.class)
