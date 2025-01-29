@@ -7,7 +7,6 @@ import io.quarkus.test.junit.TestProfile;
 
 @QuarkusTest
 @TestProfile(LazyAuthEndUserProfile.class)
-@Order(9)
 public class LazyAuthEndUserEnabledTest extends AbstractEndUserTest {
     @Override
     protected boolean isProactiveAuthEnabled() {

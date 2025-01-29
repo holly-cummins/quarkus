@@ -25,7 +25,6 @@ import jakarta.inject.Inject;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 
 import io.opentelemetry.api.trace.SpanKind;
@@ -33,7 +32,6 @@ import io.quarkus.test.junit.QuarkusTest;
 import io.smallrye.mutiny.Uni;
 import io.vertx.core.http.HttpMethod;
 
-@Order(5)
 @QuarkusTest
 public class OpenTelemetryReactiveClientTest {
     @Inject

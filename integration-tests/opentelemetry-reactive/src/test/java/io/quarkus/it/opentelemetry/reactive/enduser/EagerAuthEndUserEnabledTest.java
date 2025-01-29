@@ -7,7 +7,6 @@ import io.quarkus.test.junit.TestProfile;
 
 @QuarkusTest
 @TestProfile(EndUserProfile.class)
-@Order(7)
 public class EagerAuthEndUserEnabledTest extends AbstractEndUserTest {
 
     @Override

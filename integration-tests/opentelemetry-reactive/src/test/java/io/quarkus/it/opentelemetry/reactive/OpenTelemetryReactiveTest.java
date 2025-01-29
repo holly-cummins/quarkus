@@ -29,14 +29,12 @@ import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 
 import io.quarkus.opentelemetry.runtime.tracing.security.SecurityEventUtil;
 import io.quarkus.security.AuthenticationFailedException;
 import io.quarkus.test.junit.QuarkusTest;
 
-@Order(1)
 @QuarkusTest
 public class OpenTelemetryReactiveTest {
 
