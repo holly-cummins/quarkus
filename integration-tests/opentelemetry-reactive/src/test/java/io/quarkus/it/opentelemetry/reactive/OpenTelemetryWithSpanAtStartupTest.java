@@ -5,9 +5,11 @@ import static io.opentelemetry.api.trace.SpanKind.CLIENT;
 import static io.opentelemetry.api.trace.SpanKind.INTERNAL;
 import static io.quarkus.it.opentelemetry.reactive.Utils.getSpanByKindAndParentId;
 import static io.quarkus.it.opentelemetry.reactive.Utils.getSpans;
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.net.URI;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
@@ -38,6 +40,14 @@ public class OpenTelemetryWithSpanAtStartupTest {
 
     @Test
     void testGeneratedSpansUsingRestClientReactive() {
+
+        // There's a bit of asynchronousness in recording and exporting the spans, so to avoid issues, give the startup spans a (small) moment to arrive
+        await().atMost(Duration.ofSeconds(5L)).pollDelay(Duration.ofMillis(50)).until(() -> {
+            // make sure spans are cleared
+            List<Map<String, Object>> spans = getSpans();
+            return !spans.isEmpty();
+        });
+
         List<Map<String, Object>> spans = getSpans();
         assertEquals(2, spans.size());
 
@@ -59,7 +69,6 @@ public class OpenTelemetryWithSpanAtStartupTest {
 
         @PostConstruct
         void onStart() {
-            System.out.println("HOLLY OTEL startup bean post construct " + enabled);
             if (enabled) {
                 callWireMockClient();
             }
@@ -67,7 +76,6 @@ public class OpenTelemetryWithSpanAtStartupTest {
 
         @WithSpan
         public void callWireMockClient() {
-            System.out.println("HOLLY OTEL calling wiremock with a span");
             RestClientBuilder.newBuilder()
                     .baseUri(URI.create("http://localhost:" + WIREMOCK_PORT))
                     .build(WireMockRestClient.class)
