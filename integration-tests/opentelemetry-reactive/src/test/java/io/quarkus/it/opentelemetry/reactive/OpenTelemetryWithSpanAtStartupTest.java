@@ -18,6 +18,7 @@ import jakarta.ws.rs.Path;
 
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.eclipse.microprofile.rest.client.RestClientBuilder;
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 
 import com.github.tomakehurst.wiremock.WireMockServer;
@@ -31,6 +32,7 @@ import io.quarkus.test.junit.QuarkusTest;
 
 @QuarkusTestResource(restrictToAnnotatedClass = true, value = OpenTelemetryWithSpanAtStartupTest.MyWireMockResource.class)
 @QuarkusTest
+@Order(1) // This has to be run before tests that do a reset()
 public class OpenTelemetryWithSpanAtStartupTest {
 
     private static final int WIREMOCK_PORT = 20001;

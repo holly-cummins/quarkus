@@ -12,7 +12,6 @@ import static io.quarkus.it.opentelemetry.reactive.Utils.getSpanEventAttrs;
 import static io.quarkus.it.opentelemetry.reactive.Utils.getSpans;
 import static io.quarkus.it.opentelemetry.reactive.Utils.getSpansByKindAndParentId;
 import static io.restassured.RestAssured.given;
-import static io.restassured.RestAssured.when;
 import static java.net.HttpURLConnection.HTTP_OK;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.stream.Collectors.toSet;
@@ -30,12 +29,14 @@ import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 
 import io.quarkus.opentelemetry.runtime.tracing.security.SecurityEventUtil;
 import io.quarkus.security.AuthenticationFailedException;
 import io.quarkus.test.junit.QuarkusTest;
 
+@Order(1)
 @QuarkusTest
 public class OpenTelemetryReactiveTest {
 
