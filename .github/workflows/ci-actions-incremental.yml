@@ -341,7 +341,7 @@ jobs:
           echo "run_tcks=${run_tcks}" >> $GITHUB_OUTPUT
 
   jvm-tests:
-    name: JVM ${{matrix.java.name}} Tests - JDK ${{matrix.java.version}}
+    name: JVM ${{matrix.java.name}} Tests - JDK ${{matrix.java.java-version}}
     runs-on: ${{ matrix.java.os-name }}
     needs: [build-jdk17, calculate-test-jobs]
     # Skip main in forks
