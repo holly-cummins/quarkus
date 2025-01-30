@@ -5,6 +5,9 @@ import static io.restassured.RestAssured.given;
 import static java.net.HttpURLConnection.HTTP_OK;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.awaitility.Awaitility.await;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.greaterThan;
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.time.Duration;
@@ -13,13 +16,11 @@ import java.util.Map;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.common.mapper.TypeRef;
 
-@Order(5)
 @QuarkusTest
 public class MetricsTest {
     @BeforeEach
@@ -80,4 +81,41 @@ public class MetricsTest {
                 }));
     }
 
+    @Test
+    void testJvmMetrics() {
+        await().atMost(10, SECONDS).until(() -> getMetrics("jvm.thread.count").size() > 2);
+
+        List<Map<String, Object>> metrics = getMetrics("jvm.thread.count");
+
+        Integer value = (Integer) ((Map) ((List) ((Map) (getMetrics("jvm.thread.count")
+                .get(metrics.size() - 1)
+                .get("longSumData")))
+                .get("points"))
+                .get(0))
+                .get("value");
+
+        assertThat(value, greaterThan(0)); // at least one thread is running
+    }
+
+    @Test
+    void testServerRequestDuration() {
+        given()
+                .when()
+                .get("/nopath")
+                .then()
+                .statusCode(200);
+
+        await().atMost(10, SECONDS).until(() -> getMetrics("http.server.request.duration").size() > 2);
+
+        List<Map<String, Object>> metrics = getMetrics("http.server.request.duration");
+
+        Integer value = (Integer) ((Map) ((List) ((Map) (getMetrics("http.server.request.duration")
+                .get(metrics.size() - 1)
+                .get("data")))
+                .get("points"))
+                .get(0))
+                .get("count");
+
+        assertThat(value, greaterThanOrEqualTo(1)); // at least one endpoint was called once
+    }
 }
