@@ -57,7 +57,7 @@ env:
   # Important: keep these selectors in sync with the grep commands in the calc_run_flags job!
   # This may be a lot better with maven 4, but with maven 3, excluding a project does not exclude its children, and it's not possible to include a project and explicitly exclude some children; compensate by doing excludes the low-tech way, at the shell level
   JVM_TEST_NORMAL_TESTS_GLOBBER: ""
-  JVM_TEST_INTEGRATION_TESTS_GLOBBER: "^((gradle)|(maven)|(devmode)|(devtools))"
+  JVM_TEST_INTEGRATION_TESTS_GLOBBER: "!((gradle)|(maven)|(devmode)|(devtools))"
   JVM_TEST_NORMAL_TESTS_SELECTOR: "-pl !docs"
   JVM_TEST_INTEGRATION_TESTS_SELECTOR: ""
   JVM_TEST_NORMAL_TESTS_PL_INVERSION: "!" # For the integration tests we select them explicitly, for the other tests we select them by excluding the integration test directory
@@ -446,7 +446,7 @@ jobs:
         # pl does not include or exclude child projects so if we want to run all the integration tests,
         run: |
           PL=""
-          setopt extendedglob
+          shopt -s extglob  
           for f in integration-tests/${{ matrix.java.maven_globber }} do
             PL=${{ matrix.java.maven_pl_inversion }}$f,
           done
