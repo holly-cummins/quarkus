@@ -447,7 +447,7 @@ jobs:
         run: |
           PL=""
           shopt -s extglob  
-          for f in integration-tests/${{ matrix.java.maven_globber }} do
+          for f in integration-tests/${{ matrix.java.maven_globber }}; do
             PL=${{ matrix.java.maven_pl_inversion }}$f
           done
           echo "Made PL $PL"
