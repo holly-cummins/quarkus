@@ -375,7 +375,6 @@
                 <module>opentelemetry-vertx-exporter</module>
                 <module>opentelemetry-reactive-messaging</module>
                 <module>opentelemetry-redis-instrumentation</module>
-                <module>opentelemetry-jaeger-remote</module>
                 <module>logging-json</module>
                 <module>jaxb</module>
                 <module>jaxp</module>
