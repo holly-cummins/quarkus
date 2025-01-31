@@ -55,7 +55,7 @@ env:
   NATIVE_TEST_MAVEN_ARGS: "-Dtest-containers -Dstart-containers -Dquarkus.native.native-image-xmx=6g -Dnative -Dnative.surefire.skip -Dno-descriptor-tests clean install -DskipDocs"
   JVM_TEST_MAVEN_ARGS: "-Dtest-containers -Dstart-containers -Dquarkus.test.hang-detection-timeout=300"
   JVM_TEST_INTEGRATION_TESTS_SELECTOR: "-pl integration-tests"
-  JVM_TEST_NOT_INTEGRATION_TESTS_SELECTOR: ""
+  JVM_TEST_NOT_INTEGRATION_TESTS_SELECTOR: "-pl !docs"
   # This may be a lot better with maven 4, but with maven 3, excluding a project does not exclude its children, and it's not possible to include a project and explicitly exclude some children; compensate by doing excludes the low-tech way, at the shell level
   JVM_TEST_INTEGRATION_TESTS_EXCLUDES: "integration-tests/gradle integration-tests/maven integration-tests/devmode integration-tests/devtools"
   JVM_TEST_NOT_INTEGRATION_TESTS_EXCLUDES: "integration-tests"
@@ -438,12 +438,12 @@ jobs:
           develocity-token-expiry: 6
       - name: Exclude projects
         # Maven isn't flexible enough to allow us to include and exclude projects we want with the maven arguments, so do it the brutal low-tech way, by removing stuff we don't want
-        run: rm -rf ${{ matrix.java.maven_manual_exclude }}
+        run: rm -rf ${{ matrix.java.maven_manual_excludes }}
       - name: Build
         env:
           CAPTURE_BUILD_SCAN: true
         # Despite the pre-calculated run_jvm flag, GIB has to be re-run here to figure out the exact submodules to build.
-        run: ./mvnw $COMMON_MAVEN_ARGS $COMMON_TEST_MAVEN_ARGS $PTS_MAVEN_ARGS clean install -Dsurefire.timeout=1200 ${{matrix.java.maven_selector}} -Dno-test-kubernetes -pl !docs ${{ matrix.java.maven_args }} ${{ needs.build-jdk17.outputs.gib_args }}
+        run: ./mvnw $COMMON_MAVEN_ARGS $COMMON_TEST_MAVEN_ARGS $PTS_MAVEN_ARGS clean install -Dsurefire.timeout=1200 ${{matrix.java.maven_selector}} -Dno-test-kubernetes ${{ matrix.java.maven_args }} ${{ needs.build-jdk17.outputs.gib_args }}
       - name: Clean Gradle temp directory
         if: always()
         run: devtools/gradle/gradlew --stop && rm -rf devtools/gradle/gradle-extension-plugin/build/tmp
