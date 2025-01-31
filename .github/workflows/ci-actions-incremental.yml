@@ -54,7 +54,7 @@ env:
   COMMON_TEST_MAVEN_ARGS: "-Dformat.skip -Denforcer.skip -DskipDocs -Dforbiddenapis.skip -DskipExtensionValidation -DskipCodestartValidation"
   NATIVE_TEST_MAVEN_ARGS: "-Dtest-containers -Dstart-containers -Dquarkus.native.native-image-xmx=6g -Dnative -Dnative.surefire.skip -Dno-descriptor-tests clean install -DskipDocs"
   JVM_TEST_MAVEN_ARGS: "-Dtest-containers -Dstart-containers -Dquarkus.test.hang-detection-timeout=300"
-  JVM_TEST_INTEGRATION_TESTS_SELECTOR: "-pl integration-tests -pl '!integration-tests/gradle' -pl '!integration-tests/maven' -pl '!integration-tests/devmode' -pl '!integration-tests/devtools'"
+  JVM_TEST_INTEGRATION_TESTS_SELECTOR: "-f integration-tests -pl !integration-tests/gradle -pl !integration-tests/maven -pl !integration-tests/devmode -pl !integration-tests/devtools"
   JVM_TEST_NOT_INTEGRATION_TESTS_SELECTOR: "-pl !docs"
   # This may be a lot better with maven 4, but with maven 3, excluding a project does not exclude its children, and it's not possible to include a project and explicitly exclude some children; compensate by doing excludes the low-tech way, at the shell level
   JVM_TEST_INTEGRATION_TESTS_EXCLUDES: ""
