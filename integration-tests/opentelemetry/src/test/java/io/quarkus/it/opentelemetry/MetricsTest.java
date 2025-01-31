@@ -30,7 +30,7 @@ public class MetricsTest {
             if (spans.size() == 0) {
                 return true;
             } else {
-        given().get("/reset").then().statusCode(HTTP_OK);
+                given().get("/reset").then().statusCode(HTTP_OK);
                 return false;
             }
         });
