@@ -4,7 +4,7 @@
         "java-version": 17,
         "maven_selector": "$JVM_TEST_NORMAL_TESTS_SELECTOR",
         "maven_globber": "$JVM_TEST_NORMAL_TESTS_GLOBBER",
-        "maven_pl_inversion": "${JVM_TEST_NORMAL_TESTS_PL_INVERSION}",
+        "maven_pl_inversion": "$JVM_TEST_NORMAL_TESTS_PL_INVERSION",
         "maven_args": "$JVM_TEST_MAVEN_ARGS",
         "maven_opts": "-Xmx2g -XX:MaxMetaspaceSize=1g",
         "os-name": "ubuntu-latest"
@@ -15,7 +15,7 @@
         "java-version-gradle": 20,
         "maven_selector": "$JVM_TEST_NORMAL_TESTS_SELECTOR",
         "maven_globber": "$JVM_TEST_NORMAL_TESTS_GLOBBER",
-        "maven_pl_inversion": "${JVM_TEST_NORMAL_TESTS_PL_INVERSION}",
+        "maven_pl_inversion": "$JVM_TEST_NORMAL_TESTS_PL_INVERSION",
         "maven_args": "$JVM_TEST_MAVEN_ARGS",
         "maven_opts": "-Xmx3g -XX:MaxMetaspaceSize=1g",
         "os-name": "ubuntu-latest"
@@ -25,7 +25,7 @@
         "java-version": 17,
         "maven_selector": "$JVM_TEST_NORMAL_TESTS_SELECTOR",
         "maven_globber": "$JVM_TEST_NORMAL_TESTS_GLOBBER",
-        "maven_pl_inversion": "${JVM_TEST_NORMAL_TESTS_PL_INVERSION}",
+        "maven_pl_inversion": "$JVM_TEST_NORMAL_TESTS_PL_INVERSION",
         "maven_args": "-DskipDocs -Dformat.skip",
         "maven_opts": "-Xmx2g -XX:MaxMetaspaceSize=1g",
         "os-name": "windows-latest"
@@ -35,7 +35,7 @@
         "java-version": 17,
         "maven_selector": "$JVM_TEST_INTEGRATION_TESTS_SELECTOR",
         "maven_globber": "$JVM_TEST_INTEGRATION_TESTS_GLOBBER",
-        "maven_pl_inversion": "${JVM_TEST_INTEGRATION_TESTS_PL_INVERSION}",
+        "maven_pl_inversion": "$JVM_TEST_INTEGRATION_TESTS_PL_INVERSION",
         "maven_args": "$JVM_TEST_MAVEN_ARGS",
         "maven_opts": "-Xmx2g -XX:MaxMetaspaceSize=1g",
         "os-name": "ubuntu-latest"
@@ -46,7 +46,7 @@
         "java-version-gradle": 20,
         "maven_selector": "$JVM_TEST_INTEGRATION_TESTS_SELECTOR",
         "maven_globber": "$JVM_TEST_INTEGRATION_TESTS_GLOBBER",
-        "maven_pl_inversion": "${JVM_TEST_INTEGRATION_TESTS_PL_INVERSION}",
+        "maven_pl_inversion": "$JVM_TEST_INTEGRATION_TESTS_PL_INVERSION",
         "maven_args": "$JVM_TEST_MAVEN_ARGS",
         "maven_opts": "-Xmx3g -XX:MaxMetaspaceSize=1g",
         "os-name": "ubuntu-latest"
@@ -56,7 +56,7 @@
         "java-version": 17,
         "maven_selector": "$JVM_TEST_INTEGRATION_TESTS_SELECTOR",
         "maven_globber": "$JVM_TEST_INTEGRATION_TESTS_GLOBBER",
-        "maven_pl_inversion": "${JVM_TEST_INTEGRATION_TESTS_PL_INVERSION}",
+        "maven_pl_inversion": "$JVM_TEST_INTEGRATION_TESTS_PL_INVERSION",
         "maven_args": "-DskipDocs -Dformat.skip",
         "maven_opts": "-Xmx2g -XX:MaxMetaspaceSize=1g",
         "os-name": "windows-latest"

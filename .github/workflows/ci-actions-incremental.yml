@@ -451,7 +451,7 @@ jobs:
             PL=${{ matrix.java.maven_pl_inversion }}$f
           done
           echo "Made PL $PL"
-          ./mvnw $COMMON_MAVEN_ARGS $COMMON_TEST_MAVEN_ARGS $PTS_MAVEN_ARGS clean install -pl $PL -pl ${{ matrix.java.maven_selector }} -Dsurefire.timeout=1200  -Dno-test-kubernetes ${{ matrix.java.maven_args }} ${{ needs.build-jdk17.outputs.gib_args }}
+          ./mvnw $COMMON_MAVEN_ARGS $COMMON_TEST_MAVEN_ARGS $PTS_MAVEN_ARGS clean install -pl $PL ${{ matrix.java.maven_selector }} -Dsurefire.timeout=1200  -Dno-test-kubernetes ${{ matrix.java.maven_args }} ${{ needs.build-jdk17.outputs.gib_args }}
       - name: Clean Gradle temp directory
         if: always()
         run: devtools/gradle/gradlew --stop && rm -rf devtools/gradle/gradle-extension-plugin/build/tmp
