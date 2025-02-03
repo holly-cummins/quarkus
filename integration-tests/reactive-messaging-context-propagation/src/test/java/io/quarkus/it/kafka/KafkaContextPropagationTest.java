@@ -19,6 +19,14 @@ import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.kafka.KafkaCompanionResource;
 
+/*
+This order passes on JVM 21 and 17 both.
+    @Order(3)
+    @Order(5)
+    @Order(7)
+    @Order(10)
+    @Order(8)
+ */
 @QuarkusTest
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @QuarkusTestResource(KafkaCompanionResource.class)
@@ -61,13 +69,14 @@ public class KafkaContextPropagationTest {
         given().body("rose").post("/flowers/contextual/virtual-thread").then().statusCode(204);
     }
 
+    @Order(4)
     @Test
     @EnabledForJreRange(min = JRE.JAVA_21)
     void testContextPropagationVirtualThreadUni() {
         given().body("rose").post("/flowers/contextual/uni/virtual-thread").then().statusCode(204);
     }
 
-    @Order(3)
+    @Order(300)
     @Test
     void testAbsenceOfContextPropagation() {
         given().body("rose").post("/flowers").then()
@@ -90,7 +99,7 @@ public class KafkaContextPropagationTest {
                 .body(assertBodyRequestScopedContextWasNotActive());
     }
 
-    @Order(10)
+    @Order(25)
     @Test
     void testAbsenceOfContextPropagationBlockingUni() {
         System.out.println("HOLLY order confirmation" + "testAbsenceOfContextPropagationBlockingUni");
@@ -114,7 +123,7 @@ public class KafkaContextPropagationTest {
                 .body(assertBodyRequestScopedContextWasNotActive());
     }
 
-    @Order(6)
+    @Order(3)
     @Test
     @EnabledForJreRange(min = JRE.JAVA_21)
     void testAbsenceOfContextPropagationVirtualThread() {
