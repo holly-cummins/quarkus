@@ -90,7 +90,7 @@ public class KafkaContextPropagationTest {
                 .body(assertBodyRequestScopedContextWasNotActive());
     }
 
-    @Order(10)
+    @Order(7)
     @Test
     void testAbsenceOfContextPropagationBlockingUni() {
         System.out.println("HOLLY order confimration " + "testAbsenceOfContextPropagationBlockingUni");
@@ -114,7 +114,7 @@ public class KafkaContextPropagationTest {
                 .body(assertBodyRequestScopedContextWasNotActive());
     }
 
-    @Order(6)
+    @Order(10)
     @Test
     @EnabledForJreRange(min = JRE.JAVA_21)
     void testAbsenceOfContextPropagationVirtualThread() {
@@ -123,6 +123,7 @@ public class KafkaContextPropagationTest {
                 .body(assertBodyRequestScopedContextWasNotActive());
     }
 
+    @Order(8)
     @Test
     @EnabledForJreRange(min = JRE.JAVA_21)
     void testAbsenceOfContextPropagationVirtualThreadUni() {
