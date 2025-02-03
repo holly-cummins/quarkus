@@ -81,6 +81,7 @@ public class KafkaContextPropagationTest {
                 .body(assertBodyRequestScopedContextWasNotActive());
     }
 
+    @Order(5)
     @Test
     void testAbsenceOfContextPropagationBlocking() {
         given().body("rose").post("/flowers/blocking").then()
@@ -88,7 +89,7 @@ public class KafkaContextPropagationTest {
                 .body(assertBodyRequestScopedContextWasNotActive());
     }
 
-    @Order(1)
+    @Order(10)
     @Test
     void testAbsenceOfContextPropagationBlockingUni() {
         System.out.println("HOLLY order confimration " + "testAbsenceOfContextPropagationBlockingUni");
