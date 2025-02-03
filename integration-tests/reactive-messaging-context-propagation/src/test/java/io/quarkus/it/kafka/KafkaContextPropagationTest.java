@@ -99,7 +99,7 @@ public class KafkaContextPropagationTest {
                 .body(assertBodyRequestScopedContextWasNotActive());
     }
 
-    @Order(25)
+    @Order(75)
     @Test
     void testAbsenceOfContextPropagationBlockingUni() {
         System.out.println("HOLLY order confirmation" + "testAbsenceOfContextPropagationBlockingUni");
