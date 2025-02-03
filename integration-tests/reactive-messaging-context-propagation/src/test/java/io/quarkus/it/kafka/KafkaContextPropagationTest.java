@@ -8,7 +8,10 @@ import static org.hamcrest.Matchers.not;
 import java.util.concurrent.TimeUnit;
 
 import org.hamcrest.Matcher;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.condition.EnabledForJreRange;
 import org.junit.jupiter.api.condition.JRE;
 
@@ -17,11 +20,13 @@ import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.kafka.KafkaCompanionResource;
 
 @QuarkusTest
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @QuarkusTestResource(KafkaCompanionResource.class)
 public class KafkaContextPropagationTest {
 
     @Test
     void testContextPropagation() {
+        System.out.println("HOLLY order confirmation " + "testContextPropagation");
         given().body("rose").post("/flowers/contextual").then().statusCode(204);
     }
 
@@ -62,6 +67,7 @@ public class KafkaContextPropagationTest {
         given().body("rose").post("/flowers/contextual/uni/virtual-thread").then().statusCode(204);
     }
 
+    @Order(3)
     @Test
     void testAbsenceOfContextPropagation() {
         given().body("rose").post("/flowers").then()
@@ -76,6 +82,7 @@ public class KafkaContextPropagationTest {
                 .body(assertBodyRequestScopedContextWasNotActive());
     }
 
+    @Order(5)
     @Test
     void testAbsenceOfContextPropagationBlocking() {
         given().body("rose").post("/flowers/blocking").then()
@@ -83,8 +90,11 @@ public class KafkaContextPropagationTest {
                 .body(assertBodyRequestScopedContextWasNotActive());
     }
 
+    @Order(10)
     @Test
     void testAbsenceOfContextPropagationBlockingUni() {
+        System.out.println("HOLLY order confirmation" + "testAbsenceOfContextPropagationBlockingUni");
+
         given().body("rose").post("/flowers/uni/blocking").then()
                 .statusCode(500)
                 .body(assertBodyRequestScopedContextWasNotActive());
@@ -104,6 +114,7 @@ public class KafkaContextPropagationTest {
                 .body(assertBodyRequestScopedContextWasNotActive());
     }
 
+    @Order(6)
     @Test
     @EnabledForJreRange(min = JRE.JAVA_21)
     void testAbsenceOfContextPropagationVirtualThread() {
