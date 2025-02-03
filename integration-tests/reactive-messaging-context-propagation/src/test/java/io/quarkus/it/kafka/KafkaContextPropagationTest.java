@@ -113,6 +113,7 @@ public class KafkaContextPropagationTest {
                 .body(assertBodyRequestScopedContextWasNotActive());
     }
 
+    @Order(6)
     @Test
     @EnabledForJreRange(min = JRE.JAVA_21)
     void testAbsenceOfContextPropagationVirtualThread() {
