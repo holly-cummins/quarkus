@@ -27,7 +27,6 @@ public class KafkaContextPropagationTest {
     @Order(1)
     @Test
     void testContextPropagation() {
-        System.out.println("HOLLY order confirmation " + "testContextPropagation");
         given().body("rose").post("/flowers/contextual").then().statusCode(204);
     }
 
@@ -99,11 +98,9 @@ public class KafkaContextPropagationTest {
                 .body(assertBodyRequestScopedContextWasNotActive());
     }
 
-    @Order(25)
+    @Order(75)
     @Test
     void testAbsenceOfContextPropagationBlockingUni() {
-        System.out.println("HOLLY order confirmation" + "testAbsenceOfContextPropagationBlockingUni");
-
         given().body("rose").post("/flowers/uni/blocking").then()
                 .statusCode(500)
                 .body(assertBodyRequestScopedContextWasNotActive());
