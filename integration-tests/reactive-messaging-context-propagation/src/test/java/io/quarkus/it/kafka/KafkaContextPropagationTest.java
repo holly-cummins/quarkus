@@ -67,6 +67,7 @@ public class KafkaContextPropagationTest {
         given().body("rose").post("/flowers/contextual/uni/virtual-thread").then().statusCode(204);
     }
 
+    @Order(3)
     @Test
     void testAbsenceOfContextPropagation() {
         given().body("rose").post("/flowers").then()
