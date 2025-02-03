@@ -24,6 +24,4 @@ public class KafkaContextPropagationTest {
         return containsString("RequestScoped context was not active");
     }
 
-
-
 }
