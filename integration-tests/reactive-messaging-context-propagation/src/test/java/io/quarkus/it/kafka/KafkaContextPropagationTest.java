@@ -19,50 +19,49 @@ import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.kafka.KafkaCompanionResource;
 
-/*
-This order passes on JVM 21 and 17 both.
-    @Order(3)
-    @Order(5)
-    @Order(7)
-    @Order(10)
-    @Order(8)
- */
 @QuarkusTest
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @QuarkusTestResource(KafkaCompanionResource.class)
 public class KafkaContextPropagationTest {
 
+    @Order(1)
     @Test
     void testContextPropagation() {
         System.out.println("HOLLY order confirmation " + "testContextPropagation");
         given().body("rose").post("/flowers/contextual").then().statusCode(204);
     }
 
+    @Order(1)
     @Test
     void testContextPropagationUni() {
         given().body("rose").post("/flowers/contextual/uni").then().statusCode(204);
     }
 
+    @Order(1)
     @Test
     void testContextPropagationBlocking() {
         given().body("rose").post("/flowers/contextual/blocking").then().statusCode(204);
     }
 
+    @Order(1)
     @Test
     void testContextPropagationBlockingUni() {
         given().body("rose").post("/flowers/contextual/uni/blocking").then().statusCode(204);
     }
 
+    @Order(1)
     @Test
     void testContextPropagationBlockingNamed() {
         given().body("rose").post("/flowers/contextual/blocking-named").then().statusCode(204);
     }
 
+    @Order(1)
     @Test
     void testContextPropagationBlockingNamedUni() {
         given().body("rose").post("/flowers/contextual/uni/blocking-named").then().statusCode(204);
     }
 
+    @Order(1)
     @Test
     @EnabledForJreRange(min = JRE.JAVA_21)
     void testContextPropagationVirtualThread() {
@@ -84,6 +83,7 @@ public class KafkaContextPropagationTest {
                 .body(assertBodyRequestScopedContextWasNotActive());
     }
 
+    @Order(1)
     @Test
     void testAbsenceOfContextPropagationUni() {
         given().body("rose").post("/flowers/uni").then()
@@ -109,6 +109,7 @@ public class KafkaContextPropagationTest {
                 .body(assertBodyRequestScopedContextWasNotActive());
     }
 
+    @Order(1)
     @Test
     void testAbsenceOfContextPropagationBlockingNamed() {
         given().body("rose").post("/flowers/blocking-named").then()
@@ -116,6 +117,7 @@ public class KafkaContextPropagationTest {
                 .body(assertBodyRequestScopedContextWasNotActive());
     }
 
+    @Order(1)
     @Test
     void testAbsenceOfContextPropagationBlockingNamedUni() {
         given().body("rose").post("/flowers/uni/blocking-named").then()
@@ -132,6 +134,7 @@ public class KafkaContextPropagationTest {
                 .body(assertBodyRequestScopedContextWasNotActive());
     }
 
+    @Order(1)
     @Test
     @EnabledForJreRange(min = JRE.JAVA_21)
     void testAbsenceOfContextPropagationVirtualThreadUni() {
@@ -144,6 +147,7 @@ public class KafkaContextPropagationTest {
         return containsString("RequestScoped context was not active");
     }
 
+    @Order(1)
     @Test
     void testIncomingFromConnector() {
         given().body("rose").post("/flowers/produce").then()
