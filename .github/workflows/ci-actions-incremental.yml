@@ -53,7 +53,11 @@ env:
   COMMON_MAVEN_ARGS: "-e -B --settings .github/mvn-settings.xml --fail-at-end"
   COMMON_TEST_MAVEN_ARGS: "-Dformat.skip -Denforcer.skip -DskipDocs -Dforbiddenapis.skip -DskipExtensionValidation -DskipCodestartValidation"
   NATIVE_TEST_MAVEN_ARGS: "-Dtest-containers -Dstart-containers -Dquarkus.native.native-image-xmx=6g -Dnative -Dnative.surefire.skip -Dno-descriptor-tests clean install -DskipDocs"
-  JVM_TEST_MAVEN_ARGS: "-Dtest-containers -Dstart-containers -Dquarkus.test.hang-detection-timeout=60"
+  JVM_TEST_MAVEN_ARGS: "-Dtest-containers -Dstart-containers -Dquarkus.test.hang-detection-timeout=300"
+  # Important: keep these selectors in sync with the grep commands in the calc_run_flags job!
+  # This may be a lot better with maven 4, but with maven 3, excluding a project does not exclude its children, and it's not possible to include a project and explicitly exclude some children; compensate by doing excludes the low-tech way, at the shell level
+  JVM_TEST_INTEGRATION_TESTS_SELECTOR: "-f integration-tests -pl !gradle -pl !maven -pl !devmode -pl !devtools"
+  JVM_TEST_NORMAL_TESTS_SELECTOR: "-pl !docs -Dno-test-modules"
   PTS_MAVEN_ARGS: "-Ddevelocity.pts.enabled=${{ github.event_name == 'pull_request' && github.base_ref == 'main' && 'true' || 'false' }}"
   DB_USER: hibernate_orm_test
   DB_PASSWORD: hibernate_orm_test
@@ -336,7 +340,7 @@ jobs:
           echo "run_tcks=${run_tcks}" >> $GITHUB_OUTPUT
 
   jvm-tests:
-    name: JVM Tests - JDK ${{matrix.java.name}}
+    name: ${{ matrix.java.name }}
     runs-on: ${{ matrix.java.os-name }}
     needs: [build-jdk17, calculate-test-jobs]
     # Skip main in forks
@@ -352,8 +356,8 @@ jobs:
     steps:
       - name: Gradle Enterprise environment
         run: |
-          echo "GE_TAGS=jdk-${{matrix.java.name}}" >> "$GITHUB_ENV"
-          echo "GE_CUSTOM_VALUES=gh-job-name=JVM Tests - JDK ${{matrix.java.name}}" >> "$GITHUB_ENV"
+          echo "GE_TAGS=jdk-${{matrix.java.java-version}}" >> "$GITHUB_ENV"
+          echo "GE_CUSTOM_VALUES=gh-job-name=${{ matrix.java.name }}" >> "$GITHUB_ENV"
       - name: Stop mysql
         if: "!startsWith(matrix.java.os-name, 'windows') && !startsWith(matrix.java.os-name, 'macos')"
         run: |
@@ -419,14 +423,14 @@ jobs:
         if: github.event_name == 'pull_request'
         with:
           path: ~/.m2/.develocity/build-cache
-          key: develocity-cache-JVM Tests - JDK ${{matrix.java.name}}-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          key: develocity-cache-${{matrix.java.name}}-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
           restore-keys: |
-            develocity-cache-JVM Tests - JDK ${{matrix.java.name}}-${{ github.event.pull_request.number }}-
+            develocity-cache-${{matrix.java.name}}-${{ github.event.pull_request.number }}-
       - name: Setup Develocity Build Scan capture
         uses: gradle/develocity-actions/setup-maven@v1.3
         with:
           capture-strategy: ON_DEMAND
-          job-name: "JVM Tests - JDK ${{matrix.java.name}}"
+          job-name: "${{ matrix.java.name }}"
           add-pr-comment: false
           add-job-summary: false
           develocity-access-key: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
@@ -434,8 +438,15 @@ jobs:
       - name: Build
         env:
           CAPTURE_BUILD_SCAN: true
-        # Despite the pre-calculated run_jvm flag, GIB has to be re-run here to figure out the exact submodules to build.
-        run: ./mvnw $COMMON_MAVEN_ARGS $COMMON_TEST_MAVEN_ARGS $PTS_MAVEN_ARGS clean install -Dsurefire.timeout=1200 -pl !integration-tests/ -Dno-test-kubernetes -pl !docs ${{ matrix.java.maven_args }} ${{ needs.build-jdk17.outputs.gib_args }}
+        run: |
+          if [[ "${{ matrix.java.category }}" == *"Integration"* ]]; then
+            PL=$JVM_TEST_INTEGRATION_TESTS_SELECTOR
+          else
+            PL=$JVM_TEST_NORMAL_TESTS_SELECTOR
+          fi
+          # Despite the pre-calculated run_jvm flag, GIB has to be re-run here to figure out the exact submodules to build.
+          ./mvnw $COMMON_MAVEN_ARGS $COMMON_TEST_MAVEN_ARGS $PTS_MAVEN_ARGS $PL clean install -Dsurefire.timeout=1200  -Dno-test-kubernetes ${{ matrix.java.maven_args }} ${{ needs.build-jdk17.outputs.gib_args }} -Dgib.logImpactedTo=gib-impacted.log -Dgib.disableSelectedProjectsHandling
+
       - name: Clean Gradle temp directory
         if: always()
         run: devtools/gradle/gradlew --stop && rm -rf devtools/gradle/gradle-extension-plugin/build/tmp
@@ -449,7 +460,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: test-reports-jvm${{matrix.java.name}}
+          name: test-reports-${{matrix.java.name}}
           path: 'test-reports.tgz'
           retention-days: 7
       - name: Prepare build reports archive
@@ -464,7 +475,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: "build-reports-${{ github.run_attempt }}-JVM Tests - JDK ${{matrix.java.name}}"
+          name: "build-reports-${{ github.run_attempt }}-${{ matrix.java.name }}"
           path: |
             build-reports.zip
           retention-days: 7
@@ -474,7 +485,7 @@ jobs:
         # -- even in case of success, as some flaky tests won't fail the build
         if: always()
         with:
-          name: "debug-${{ github.run_attempt }}-JVM Tests - JDK ${{matrix.java.name}}"
+          name: "debug-${{ github.run_attempt }}-${{ matrix.java.name }}"
           path: "**/target/debug/**"
           if-no-files-found: ignore # If we're not currently debugging any test, it's fine.
           retention-days: 28 # We don't get notified for flaky tests, so let's give maintainers time to get back to it
@@ -482,159 +493,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: ${{ failure() || cancelled() }}
         with:
-          name: "build-logs-JVM Tests - JDK ${{matrix.java.name}}"
-          path: |
-            **/build.log
-          retention-days: 7
-
-  integration-tests:
-    name: Integration Tests - JDK ${{matrix.java.name}}
-    runs-on: ${{ matrix.java.os-name }}
-    needs: [build-jdk17, calculate-test-jobs]
-    # Skip main in forks
-    if: "needs.calculate-test-jobs.outputs.run_jvm == 'true' && (github.repository == 'quarkusio/quarkus' || !endsWith(github.ref, '/main'))"
-    timeout-minutes: 400
-    env:
-      MAVEN_OPTS: ${{ matrix.java.maven_opts }}
-      JAVA_VERSION_GRADLE: ${{ matrix.java.java-version-gradle || matrix.java.java-version }}
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJson(needs.calculate-test-jobs.outputs.jvm_matrix) }}
-
-    steps:
-      - name: Gradle Enterprise environment
-        run: |
-          echo "GE_TAGS=jdk-${{matrix.java.name}}" >> "$GITHUB_ENV"
-          echo "GE_CUSTOM_VALUES=gh-job-name=JVM Tests - JDK ${{matrix.java.name}}" >> "$GITHUB_ENV"
-      - name: Stop mysql
-        if: "!startsWith(matrix.java.os-name, 'windows') && !startsWith(matrix.java.os-name, 'macos')"
-        run: |
-          ss -ln
-          sudo service mysql stop || true
-      - name: Support longpaths on Windows
-        if: "startsWith(matrix.java.os-name, 'windows')"
-        run: git config --global core.longpaths true
-      - uses: actions/checkout@v4
-        with:
-          # this is important for GIB to work
-          fetch-depth: 0
-      - name: Add quarkusio remote for GIB
-        run: git remote show quarkusio &> /dev/null || git remote add quarkusio https://github.com/quarkusio/quarkus.git
-
-      - name: apt clean
-        if: "!startsWith(matrix.java.os-name, 'windows') && !startsWith(matrix.java.os-name, 'macos')"
-        run: sudo apt-get clean
-
-      - name: Reclaim Disk Space
-        if: "!startsWith(matrix.java.os-name, 'windows') && !startsWith(matrix.java.os-name, 'macos')"
-        run: .github/ci-prerequisites.sh
-
-      - name: Set up JDK ${{ env.JAVA_VERSION_GRADLE }} for Gradle (if needed)
-        if: ${{ env.JAVA_VERSION_GRADLE != matrix.java.java-version }}
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: ${{ matrix.java.java-version-gradle }}
-          architecture: ${{ matrix.java.architecture || 'x64' }}
-
-      - name: Set up GRADLE_JAVA_HOME (if needed)
-        if: ${{ env.JAVA_VERSION_GRADLE != matrix.java.java-version }}
-        run: |
-          JAVA_HOME_ARCHITECTURE=$(echo "${{ matrix.java.architecture || 'x64' }}" | tr [:lower:] [:upper:])
-          GRADLE_JAVA_HOME_VARIABLE="JAVA_HOME_${JAVA_VERSION_GRADLE}_${JAVA_HOME_ARCHITECTURE}"
-          echo "GRADLE_JAVA_HOME=${!GRADLE_JAVA_HOME_VARIABLE}" >> "$GITHUB_ENV"
-
-      - name: Set up JDK ${{ matrix.java.java-version }}
-        uses: actions/setup-java@v4
-        with:
-          distribution: ${{ matrix.java.java-distribution || 'temurin' }}
-          java-version: ${{ matrix.java.java-version }}
-          architecture: ${{ matrix.java.architecture || 'x64' }}
-
-      - name: Restore Maven Repository
-        uses: actions/cache/restore@v4
-        with:
-          path: ~/.m2/repository
-          key: ${{ needs.build-jdk17.outputs.m2-cache-key }}
-          restore-keys: |
-            ${{ needs.build-jdk17.outputs.m2-monthly-branch-cache-key }}-
-            ${{ needs.build-jdk17.outputs.m2-monthly-cache-key }}-
-      - name: Download previously uploaded .m2 content
-        uses: actions/download-artifact@v4
-        with:
-          name: m2-content
-          path: .
-      - name: Extract previously uploaded .m2 content
-        run: tar -xzf m2-content.tgz -C ~
-      - name: Cache Develocity local cache
-        uses: actions/cache@v4
-        if: github.event_name == 'pull_request'
-        with:
-          path: ~/.m2/.develocity/build-cache
-          key: develocity-cache-JVM Tests - JDK ${{matrix.java.name}}-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
-          restore-keys: |
-            develocity-cache-JVM Tests - JDK ${{matrix.java.name}}-${{ github.event.pull_request.number }}-
-      - name: Setup Develocity Build Scan capture
-        uses: gradle/develocity-actions/setup-maven@v1.3
-        with:
-          capture-strategy: ON_DEMAND
-          job-name: "JVM Tests - JDK ${{matrix.java.name}}"
-          add-pr-comment: false
-          add-job-summary: false
-          develocity-access-key: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
-          develocity-token-expiry: 6
-      - name: Build
-        env:
-          CAPTURE_BUILD_SCAN: true
-        # Despite the pre-calculated run_jvm flag, GIB has to be re-run here to figure out the exact submodules to build.
-        run: ./mvnw $COMMON_MAVEN_ARGS $COMMON_TEST_MAVEN_ARGS $PTS_MAVEN_ARGS clean install -Dsurefire.timeout=1200 -pl integration-tests/ -pl !integration-tests/gradle -pl !integration-tests/maven -pl !integration-tests/devmode -pl !integration-tests/devtools -Dno-test-kubernetes -pl !docs ${{ matrix.java.maven_args }} ${{ needs.build-jdk17.outputs.gib_args }}
-      - name: Clean Gradle temp directory
-        if: always()
-        run: devtools/gradle/gradlew --stop && rm -rf devtools/gradle/gradle-extension-plugin/build/tmp
-      - name: Analyze disk space
-        if: always() && !startsWith(matrix.java.os-name, 'windows') && !startsWith(matrix.java.os-name, 'macos')
-        run: .github/ci-disk-usage.sh
-      - name: Prepare failure archive (if maven failed)
-        if: failure()
-        run: find . -name '*-reports' -type d -o -name '*.log' | tar -czf test-reports.tgz -T -
-      - name: Upload failure Archive (if maven failed)
-        uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: test-reports-jvm${{matrix.java.name}}
-          path: 'test-reports.tgz'
-          retention-days: 7
-      - name: Prepare build reports archive
-        if: always()
-        run: |
-          7z a -tzip build-reports.zip -r \
-              '**/target/*-reports/TEST-*.xml' \
-              'target/build-report.json' \
-              'target/gradle-build-scan-url.txt' \
-              LICENSE
-      - name: Upload build reports
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: "build-reports-${{ github.run_attempt }}-JVM Tests - JDK ${{matrix.java.name}}"
-          path: |
-            build-reports.zip
-          retention-days: 7
-      - name: Upload test-produced debug dumps
-        uses: actions/upload-artifact@v4
-        # We need this as soon as there's a matching file
-        # -- even in case of success, as some flaky tests won't fail the build
-        if: always()
-        with:
-          name: "debug-${{ github.run_attempt }}-JVM Tests - JDK ${{matrix.java.name}}"
-          path: "**/target/debug/**"
-          if-no-files-found: ignore # If we're not currently debugging any test, it's fine.
-          retention-days: 28 # We don't get notified for flaky tests, so let's give maintainers time to get back to it
-      - name: Upload build.log (if build failed)
-        uses: actions/upload-artifact@v4
-        if: ${{ failure() || cancelled() }}
-        with:
-          name: "build-logs-JVM Tests - JDK ${{matrix.java.name}}"
+          name: "build-logs-${{ matrix.java.name }}"
           path: |
             **/build.log
           retention-days: 7
