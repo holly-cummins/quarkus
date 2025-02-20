@@ -441,6 +441,7 @@ jobs:
         run: |
           if [[ "${{ matrix.java.category }}" == *"Integration"* ]]; then
             PL=$JVM_TEST_INTEGRATION_TESTS_SELECTOR
+            cp mvnw integration-tests
             cd integration-tests
           else
             PL=$JVM_TEST_NORMAL_TESTS_SELECTOR
