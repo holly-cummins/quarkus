@@ -441,6 +441,7 @@ jobs:
         run: |
           if [[ "${{ matrix.java.category }}" == *"Integration"* ]]; then
             PL=$JVM_TEST_INTEGRATION_TESTS_SELECTOR
+            COMMON_MAVEN_ARGS: "-e -B --settings ../.github/mvn-settings.xml --fail-at-end"
             cp mvnw integration-tests
             cd integration-tests
           else
