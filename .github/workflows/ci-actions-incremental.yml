@@ -56,7 +56,7 @@ env:
   JVM_TEST_MAVEN_ARGS: "-Dtest-containers -Dstart-containers -Dquarkus.test.hang-detection-timeout=300"
   # Important: keep these selectors in sync with the grep commands in the calc_run_flags job!
   # This may be a lot better with maven 4, but with maven 3, excluding a project does not exclude its children, and it's not possible to include a project and explicitly exclude some children; compensate by doing excludes the low-tech way, at the shell level
-  JVM_TEST_INTEGRATION_TESTS_SELECTOR: "-f integration-tests -pl !gradle -pl !maven -pl !devmode -pl !devtools"
+  JVM_TEST_INTEGRATION_TESTS_SELECTOR: " -pl !gradle -pl !maven -pl !devmode -pl !devtools"
   JVM_TEST_NORMAL_TESTS_SELECTOR: "-pl !docs -Dno-test-modules"
   PTS_MAVEN_ARGS: "-Ddevelocity.pts.enabled=${{ github.event_name == 'pull_request' && github.base_ref == 'main' && 'true' || 'false' }}"
   DB_USER: hibernate_orm_test
@@ -441,6 +441,7 @@ jobs:
         run: |
           if [[ "${{ matrix.java.category }}" == *"Integration"* ]]; then
             PL=$JVM_TEST_INTEGRATION_TESTS_SELECTOR
+            cd integration-tests
           else
             PL=$JVM_TEST_NORMAL_TESTS_SELECTOR
           fi
