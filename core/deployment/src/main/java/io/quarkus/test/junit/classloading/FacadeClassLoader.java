@@ -408,6 +408,7 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
         String resourceKey;
 
         ClassLoader classLoader = keyMakerClassLoader;
+        System.out.println("HOLLY getting key with " + classLoader);
         Method method = Class
                 .forName("io.quarkus.test.junit.TestResourceUtil", true, classLoader) // TODO use class, not string, but that would need us to be in a different module
                 .getMethod("getReloadGroupIdentifier", Class.class, Class.class);

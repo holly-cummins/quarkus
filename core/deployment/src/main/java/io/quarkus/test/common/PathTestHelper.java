@@ -6,9 +6,11 @@ import java.io.File;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -140,6 +142,7 @@ public final class PathTestHelper {
         if (resource == null) {
             System.out.println("HOLLY BADNESS COUld not find a class using " + testClass.getClassLoader() + " and finding "
                     + fromClassNameToResourceName(testClass.getName()));
+            System.out.println("ALL URLS is " + Arrays.toString(((URLClassLoader) testClass.getClassLoader()).getURLs()));
         }
 
         if (resource.getProtocol().equals("jar")) {
