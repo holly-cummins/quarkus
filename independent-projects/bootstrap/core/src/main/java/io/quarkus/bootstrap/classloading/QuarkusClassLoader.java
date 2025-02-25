@@ -531,10 +531,6 @@ public class QuarkusClassLoader extends ClassLoader implements Closeable {
             System.out.println("HOLLY loading " + name + " with " + this);
         }
 
-        if (name.contains("io.vertx.core.Handler")) {
-            new Exception(this + "diagnostic").printStackTrace();
-        }
-
         for (ClassLoaderEventListener l : classLoaderEventListeners) {
             l.loadClass(name, this.name);
         }

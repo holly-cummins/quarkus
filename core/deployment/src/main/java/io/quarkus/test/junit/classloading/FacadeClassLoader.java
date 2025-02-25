@@ -356,7 +356,7 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
             String key;
 
             // TODO diagnostic
-            keyMakerClassLoader = peekingClassLoader;
+            //    keyMakerClassLoader = peekingClassLoader;
             // We cannot directly access TestResourceUtil as long as we're in the core module, but the app classloaders can.
             // But, chicken-and-egg, we may not have an app classloader yet. However, if we don't, we won't need to worry about restarts, but this instance clearly cannot need a restart
 
