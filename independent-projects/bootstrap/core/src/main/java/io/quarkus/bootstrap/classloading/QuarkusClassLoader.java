@@ -527,8 +527,12 @@ public class QuarkusClassLoader extends ClassLoader implements Closeable {
     protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
         ensureOpen(name);
 
-        if (name.contains("acme")) {
+        if (name.contains("acme") || name.contains("Handler")) {
             System.out.println("HOLLY loading " + name + " with " + this);
+        }
+
+        if (name.contains("Handler")) {
+            new Exception("diagnostic").printStackTrace();
         }
 
         for (ClassLoaderEventListener l : classLoaderEventListeners) {
