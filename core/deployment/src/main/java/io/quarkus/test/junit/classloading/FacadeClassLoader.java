@@ -81,7 +81,7 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
     private final Map<String, Class<?>> profiles;
     private final Set<String> quarkusTestClasses;
     private final boolean isAuxiliaryApplication;
-    private QuarkusClassLoader keyMakerClassLoader;
+    private ClassLoader keyMakerClassLoader;
 
     private static volatile FacadeClassLoader instance;
 
@@ -355,6 +355,8 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
             StartupAction startupAction;
             String key;
 
+            // TODO diagnostic
+            keyMakerClassLoader = peekingClassLoader;
             // We cannot directly access TestResourceUtil as long as we're in the core module, but the app classloaders can.
             // But, chicken-and-egg, we may not have an app classloader yet. However, if we don't, we won't need to worry about restarts, but this instance clearly cannot need a restart
 
