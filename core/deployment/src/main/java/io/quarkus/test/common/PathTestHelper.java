@@ -137,6 +137,11 @@ public final class PathTestHelper {
         String classFileName = testClass.getName().replace('.', File.separatorChar) + ".class";
         URL resource = testClass.getClassLoader().getResource(fromClassNameToResourceName(testClass.getName()));
 
+        if (resource == null) {
+            System.out.println("HOLLY BADNESS COUld not find a class using " + testClass.getClassLoader() + " and finding "
+                    + fromClassNameToResourceName(testClass.getName()));
+        }
+
         if (resource.getProtocol().equals("jar")) {
             try {
                 resource = URI.create(resource.getFile().substring(0, resource.getFile().indexOf('!'))).toURL();
