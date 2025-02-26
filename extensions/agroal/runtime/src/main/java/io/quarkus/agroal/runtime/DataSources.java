@@ -138,7 +138,7 @@ public class DataSources {
     }
 
     @SuppressWarnings("resource")
-    public AgroalDataSource createDataSource(String dataSourceName, boolean otelEnabled) {
+    public AgroalDataSource createDataSource(String dataSourceName) {
         if (!agroalDataSourceSupport.entries.containsKey(dataSourceName)) {
             throw new IllegalArgumentException("No datasource named '" + dataSourceName + "' exists");
         }
@@ -221,9 +221,7 @@ public class DataSources {
             dataSource.setPoolInterceptors(interceptorList);
         }
 
-        if (dataSourceJdbcBuildTimeConfig.telemetry() &&
-                dataSourceJdbcRuntimeConfig.telemetry().orElse(true) &&
-                otelEnabled) {
+        if (dataSourceJdbcBuildTimeConfig.telemetry() && dataSourceJdbcRuntimeConfig.telemetry().orElse(true)) {
             // activate OpenTelemetry JDBC instrumentation by wrapping AgroalDatasource
             // use an optional CDI bean as we can't reference optional OpenTelemetry classes here
             dataSource = agroalOpenTelemetryWrapper.get().apply(dataSource);

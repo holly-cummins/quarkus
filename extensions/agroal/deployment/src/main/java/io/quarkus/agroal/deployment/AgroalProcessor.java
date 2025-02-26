@@ -1,7 +1,6 @@
 package io.quarkus.agroal.deployment;
 
 import static io.quarkus.agroal.deployment.AgroalDataSourceBuildUtil.qualifiers;
-import static io.quarkus.arc.deployment.OpenTelemetrySdkBuildItem.isOtelSdkEnabled;
 import static io.quarkus.deployment.Capability.OPENTELEMETRY_TRACER;
 
 import java.sql.Driver;
@@ -27,7 +26,6 @@ import io.agroal.api.AgroalDataSource;
 import io.agroal.api.AgroalPoolInterceptor;
 import io.quarkus.agroal.DataSource;
 import io.quarkus.agroal.runtime.AgroalDataSourceSupport;
-import io.quarkus.agroal.runtime.AgroalOpenTelemetryWrapper;
 import io.quarkus.agroal.runtime.AgroalRecorder;
 import io.quarkus.agroal.runtime.DataSourceJdbcBuildTimeConfig;
 import io.quarkus.agroal.runtime.DataSources;
@@ -36,9 +34,9 @@ import io.quarkus.agroal.runtime.JdbcDriver;
 import io.quarkus.agroal.runtime.TransactionIntegration;
 import io.quarkus.agroal.spi.JdbcDataSourceBuildItem;
 import io.quarkus.agroal.spi.JdbcDriverBuildItem;
+import io.quarkus.agroal.spi.OpenTelemetryInitBuildItem;
 import io.quarkus.arc.BeanDestroyer;
 import io.quarkus.arc.deployment.AdditionalBeanBuildItem;
-import io.quarkus.arc.deployment.OpenTelemetrySdkBuildItem;
 import io.quarkus.arc.deployment.SyntheticBeanBuildItem;
 import io.quarkus.arc.deployment.UnremovableBeanBuildItem;
 import io.quarkus.arc.processor.DotNames;
@@ -129,7 +127,7 @@ class AgroalProcessor {
             // at least one datasource is using OpenTelemetry JDBC instrumentation,
             // therefore we register the OpenTelemetry data source wrapper bean
             additionalBeans.produce(new AdditionalBeanBuildItem.Builder()
-                    .addBeanClass(AgroalOpenTelemetryWrapper.class)
+                    .addBeanClass("io.quarkus.agroal.runtime.AgroalOpenTelemetryWrapper")
                     .setDefaultScope(DotNames.SINGLETON).build());
         }
 
@@ -246,13 +244,13 @@ class AgroalProcessor {
 
     @Record(ExecutionTime.RUNTIME_INIT)
     @BuildStep
+    @Consume(OpenTelemetryInitBuildItem.class)
     @Consume(NarayanaInitBuildItem.class)
     void generateDataSourceBeans(AgroalRecorder recorder,
             DataSourcesRuntimeConfig dataSourcesRuntimeConfig,
             List<AggregatedDataSourceBuildTimeConfigBuildItem> aggregatedBuildTimeConfigBuildItems,
             SslNativeConfigBuildItem sslNativeConfig,
             Capabilities capabilities,
-            Optional<OpenTelemetrySdkBuildItem> openTelemetrySdkBuildItem,
             BuildProducer<SyntheticBeanBuildItem> syntheticBeanBuildItemBuildProducer,
             BuildProducer<JdbcDataSourceBuildItem> jdbcDataSource) {
         if (aggregatedBuildTimeConfigBuildItems.isEmpty()) {
@@ -277,8 +275,7 @@ class AgroalProcessor {
                     .checkActive(recorder.agroalDataSourceCheckActiveSupplier(dataSourceName))
                     // pass the runtime config into the recorder to ensure that the DataSource related beans
                     // are created after runtime configuration has been set up
-                    .createWith(recorder.agroalDataSourceSupplier(
-                            dataSourceName, dataSourcesRuntimeConfig, isOtelSdkEnabled(openTelemetrySdkBuildItem)))
+                    .createWith(recorder.agroalDataSourceSupplier(dataSourceName, dataSourcesRuntimeConfig))
                     .destroyer(BeanDestroyer.AutoCloseableDestroyer.class);
 
             if (!DataSourceUtil.isDefault(dataSourceName)) {

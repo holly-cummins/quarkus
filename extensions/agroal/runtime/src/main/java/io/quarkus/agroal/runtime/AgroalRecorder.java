@@ -55,15 +55,13 @@ public class AgroalRecorder {
 
     public Function<SyntheticCreationalContext<AgroalDataSource>, AgroalDataSource> agroalDataSourceSupplier(
             String dataSourceName,
-            @SuppressWarnings("unused") DataSourcesRuntimeConfig dataSourcesRuntimeConfig,
-            Optional<RuntimeValue<Boolean>> otelEnabled) {
+            @SuppressWarnings("unused") DataSourcesRuntimeConfig dataSourcesRuntimeConfig) {
         return new Function<>() {
             @SuppressWarnings("deprecation")
             @Override
             public AgroalDataSource apply(SyntheticCreationalContext<AgroalDataSource> context) {
                 DataSources dataSources = context.getInjectedReference(DataSources.class);
-                return dataSources.createDataSource(dataSourceName,
-                        otelEnabled.isPresent() ? otelEnabled.get().getValue() : false);
+                return dataSources.createDataSource(dataSourceName);
             }
         };
     }

@@ -36,11 +36,11 @@ import io.opentelemetry.sdk.autoconfigure.spi.metrics.ConfigurableMetricExporter
 import io.opentelemetry.sdk.autoconfigure.spi.traces.ConfigurableSamplerProvider;
 import io.opentelemetry.sdk.autoconfigure.spi.traces.ConfigurableSpanExporterProvider;
 import io.quarkus.agroal.spi.JdbcDataSourceBuildItem;
+import io.quarkus.agroal.spi.OpenTelemetryInitBuildItem;
 import io.quarkus.arc.deployment.AdditionalBeanBuildItem;
 import io.quarkus.arc.deployment.AnnotationsTransformerBuildItem;
 import io.quarkus.arc.deployment.BeanContainerBuildItem;
 import io.quarkus.arc.deployment.InterceptorBindingRegistrarBuildItem;
-import io.quarkus.arc.deployment.OpenTelemetrySdkBuildItem;
 import io.quarkus.arc.deployment.SyntheticBeanBuildItem;
 import io.quarkus.arc.deployment.ValidationPhaseBuildItem.ValidationErrorBuildItem;
 import io.quarkus.arc.processor.InterceptorBindingRegistrar;
@@ -52,6 +52,7 @@ import io.quarkus.deployment.annotations.BuildProducer;
 import io.quarkus.deployment.annotations.BuildStep;
 import io.quarkus.deployment.annotations.BuildSteps;
 import io.quarkus.deployment.annotations.ExecutionTime;
+import io.quarkus.deployment.annotations.Produce;
 import io.quarkus.deployment.annotations.Record;
 import io.quarkus.deployment.builditem.LaunchModeBuildItem;
 import io.quarkus.deployment.builditem.RemovedResourceBuildItem;
@@ -106,11 +107,8 @@ public class OpenTelemetryProcessor {
 
     @BuildStep
     @Record(ExecutionTime.RUNTIME_INIT)
-    void openTelemetryBean(OpenTelemetryRecorder recorder,
-            OTelRuntimeConfig oTelRuntimeConfig,
-            BuildProducer<SyntheticBeanBuildItem> syntheticProducer,
-            BuildProducer<OpenTelemetrySdkBuildItem> openTelemetrySdkBuildItemBuildProducer) {
-        syntheticProducer.produce(SyntheticBeanBuildItem.configure(OpenTelemetry.class)
+    SyntheticBeanBuildItem openTelemetryBean(OpenTelemetryRecorder recorder, OTelRuntimeConfig oTelRuntimeConfig) {
+        return SyntheticBeanBuildItem.configure(OpenTelemetry.class)
                 .defaultBean()
                 .setRuntimeInit()
                 .unremovable()
@@ -124,10 +122,7 @@ public class OpenTelemetryProcessor {
                                 null))
                 .createWith(recorder.opentelemetryBean(oTelRuntimeConfig))
                 .destroyer(OpenTelemetryDestroyer.class)
-                .done());
-
-        openTelemetrySdkBuildItemBuildProducer.produce(
-                new OpenTelemetrySdkBuildItem(recorder.isOtelSdkEnabled(oTelRuntimeConfig)));
+                .done();
     }
 
     @BuildStep
@@ -263,6 +258,7 @@ public class OpenTelemetryProcessor {
 
     @BuildStep
     @Record(ExecutionTime.RUNTIME_INIT)
+    @Produce(OpenTelemetryInitBuildItem.class)
     void createOpenTelemetry(
             OpenTelemetryRecorder recorder,
             CoreVertxBuildItem vertx,
