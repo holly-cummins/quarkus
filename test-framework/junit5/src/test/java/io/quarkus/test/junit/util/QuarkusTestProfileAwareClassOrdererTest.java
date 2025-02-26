@@ -171,8 +171,6 @@ class QuarkusTestProfileAwareClassOrdererTest {
         new QuarkusTestProfileAwareClassOrderer().orderClasses(contextMock);
 
         assertThat(input).containsExactly(
-                nonQuarkusTest1Desc,
-                nonQuarkusTest2Desc,
                 quarkusTest1Desc,
                 quarkusTest1aDesc,
                 quarkusTest2Desc,
@@ -187,7 +185,9 @@ class QuarkusTestProfileAwareClassOrdererTest {
                 quarkusTestWithRestrictedResourceDesc,
                 quarkusTestWithRestrictedResourceDesc2,
                 quarkusTestWithMetaResourceDesc,
-                quarkusTestWithMetaResourceDesc2);
+                quarkusTestWithMetaResourceDesc2,
+                nonQuarkusTest1Desc,
+                nonQuarkusTest2Desc);
     }
 
     @Test
@@ -198,9 +198,9 @@ class QuarkusTestProfileAwareClassOrdererTest {
         doReturn(input).when(contextMock)
                 .getClassDescriptors();
 
-        new QuarkusTestProfileAwareClassOrderer("20_", "30_", "40_", "45_", "60_", Optional.empty()).orderClasses(contextMock);
+        new QuarkusTestProfileAwareClassOrderer("20_", "30_", "40_", "45_", "01_", Optional.empty()).orderClasses(contextMock);
 
-        assertThat(input).containsExactly(quarkusTestDesc, nonQuarkusTestDesc);
+        assertThat(input).containsExactly(nonQuarkusTestDesc, quarkusTestDesc);
     }
 
     @Test
