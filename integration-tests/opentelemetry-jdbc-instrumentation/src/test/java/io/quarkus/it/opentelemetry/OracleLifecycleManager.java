@@ -9,6 +9,7 @@ public class OracleLifecycleManager implements QuarkusTestResourceLifecycleManag
 
     @Override
     public Map<String, String> start() {
+        System.out.println("HOLLY OOO starting OracleLifecycleManager" + this.getClass().getClassLoader());
         Map<String, String> properties = new HashMap<>();
         properties.put("quarkus.datasource.oracle.jdbc.url", "jdbc:oracle:thin:@localhost:1521/FREEPDB1");
         properties.put("quarkus.datasource.oracle.password", "quarkus");
