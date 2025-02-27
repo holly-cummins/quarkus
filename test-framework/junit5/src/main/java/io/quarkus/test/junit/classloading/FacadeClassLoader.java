@@ -23,6 +23,8 @@ import java.util.Set;
 import org.eclipse.microprofile.config.spi.ConfigProviderResolver;
 import org.jboss.logging.Logger;
 import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.condition.DisabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.platform.commons.support.AnnotationSupport;
@@ -79,6 +81,8 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
     // Ideally these would be final, but we initialise them in a try-catch block and sometimes they will be caught
     private Class<? extends Annotation> quarkusTestAnnotation;
     private Class<? extends Annotation> disabledAnnotation;
+    private Class<? extends Annotation> disabledOnOsAnnotation;
+    private Method disabledOnOsAnnotationValue;
     private Class<? extends Annotation> quarkusIntegrationTestAnnotation;
     private Class<? extends Annotation> profileAnnotation;
     private Class<? extends Annotation> extendWithAnnotation;
@@ -170,6 +174,8 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
         try {
             extendWithAnnotation = (Class<? extends Annotation>) annotationLoader.loadClass(ExtendWith.class.getName());
             disabledAnnotation = (Class<? extends Annotation>) annotationLoader.loadClass(Disabled.class.getName());
+            disabledOnOsAnnotation = (Class<? extends Annotation>) annotationLoader.loadClass(DisabledOnOs.class.getName());
+            disabledOnOsAnnotationValue = disabledOnOsAnnotation.getMethod("value");
             registerExtensionAnnotation = (Class<? extends Annotation>) annotationLoader
                     .loadClass(RegisterExtension.class.getName());
             quarkusTestAnnotation = (Class<? extends Annotation>) annotationLoader
@@ -178,7 +184,7 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
                     .loadClass(QuarkusIntegrationTest.class.getName());
             profileAnnotation = (Class<? extends Annotation>) annotationLoader
                     .loadClass(TestProfile.class.getName());
-        } catch (ClassNotFoundException e) {
+        } catch (ClassNotFoundException | NoSuchMethodException e) {
             // If QuarkusTest is not on the classpath, that's fine; it just means we definitely won't have QuarkusTests. That means we can bypass a whole bunch of logic.
             log.debug("Could not load annotations for FacadeClassLoader: " + e);
         }
@@ -187,7 +193,7 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
             this.profiles = new HashMap<>();
 
             profileNames.forEach((k, profileName) -> {
-                Class profile;
+                Class<?> profile;
                 if (profileName != null) {
                     try {
                         profile = peekingClassLoader.loadClass(profileName);
@@ -238,33 +244,40 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
                         return super.loadClass(name);
                     }
 
-                    boolean isEnabled = !AnnotationSupport.isAnnotated(inspectionClass, disabledAnnotation);
+                    if (!inspectionClass.isAnnotation()) {
+                        // Because (until we do https://github.com/quarkusio/quarkus/issues/45785) we start dev services for disabled tests when we load them with the quarkus classloader, and those dev services often fail, put in some bypasses.
+                        // These bypasses are also useful for performance.
+                        // Ideally we would check for every way of disabling a test, but we don't want to recreate the JUnit logic, so just do common ones that might be guarding classes with classloading or dev-service-starting issues
+                        // That does mean our behaviour in this area is slightly inconsistent between annotations; for some we will augment before giving up and for some we won't
+                        boolean isDisabled = AnnotationSupport.isAnnotated(inspectionClass, disabledAnnotation)
+                                || isDisabledOnOs(inspectionClass);
 
-                    // If a whole test class has an @Disabled annotation, do not bother creating a quarkus app for it
-                    // Pragmatically, this fixes a LinkageError in grpc-cli which only reproduces in CI, but it's also probably what users would expect
-                    if (isEnabled && !inspectionClass.isAnnotation()) {
-                        // A Quarkus Test could be annotated with @QuarkusTest or with @ExtendWith[... QuarkusTestExtension.class ] or @RegisterExtension
-                        // An @interface isn't a quarkus test, and doesn't want its own application; to detect it, just check if it has a superclass
+                        // If a whole test class has an @Disabled annotation, do not bother creating a quarkus app for it
+                        // Pragmatically, this fixes a LinkageError in grpc-cli which only reproduces in CI, but it's also probably what users would expect
+                        if (!isDisabled) {
+                            // A Quarkus Test could be annotated with @QuarkusTest or with @ExtendWith[... QuarkusTestExtension.class ] or @RegisterExtension
+                            // An @interface isn't a quarkus test, and doesn't want its own application; to detect it, just check if it has a superclass
 
-                        isQuarkusTest = AnnotationSupport.isAnnotated(inspectionClass, quarkusTestAnnotation) // AnnotationSupport picks up cases where a class is annotated with an annotation which itself includes the annotation we care about
-                                || registersQuarkusTestExtensionWithExtendsWith(inspectionClass)
-                                || registersQuarkusTestExtensionOnField(inspectionClass);
+                            isQuarkusTest = AnnotationSupport.isAnnotated(inspectionClass, quarkusTestAnnotation) // AnnotationSupport picks up cases where a class is annotated with an annotation which itself includes the annotation we care about
+                                    || registersQuarkusTestExtensionWithExtendsWith(inspectionClass)
+                                    || registersQuarkusTestExtensionOnField(inspectionClass);
 
-                        if (isQuarkusTest) {
-                            // Many integration tests have Quarkus higher up in the hierarchy, but they do not count as QuarkusTests and have to be run differently
-                            isIntegrationTest = !inspectionClass.isAnnotation()
-                                    && (AnnotationSupport.isAnnotated(inspectionClass, quarkusIntegrationTestAnnotation));
+                            if (isQuarkusTest) {
+                                // Many integration tests have Quarkus higher up in the hierarchy, but they do not count as QuarkusTests and have to be run differently
+                                isIntegrationTest = !inspectionClass.isAnnotation()
+                                        && (AnnotationSupport.isAnnotated(inspectionClass, quarkusIntegrationTestAnnotation));
 
-                            Optional<? extends Annotation> profileDeclaration = AnnotationSupport.findAnnotation(
-                                    inspectionClass,
-                                    profileAnnotation);
-                            if (profileDeclaration.isPresent()) {
+                                Optional<? extends Annotation> profileDeclaration = AnnotationSupport.findAnnotation(
+                                        inspectionClass,
+                                        profileAnnotation);
+                                if (profileDeclaration.isPresent()) {
 
-                                Method m = profileDeclaration.get()
-                                        .getClass()
-                                        .getMethod(VALUE);
-                                // We can't be specific about what the class extends, because it's loaded with another classloader
-                                profile = (Class<?>) m.invoke(profileDeclaration.get());
+                                    Method m = profileDeclaration.get()
+                                            .getClass()
+                                            .getMethod(VALUE);
+                                    // We can't be specific about what the class extends, because it's loaded with another classloader
+                                    profile = (Class<?>) m.invoke(profileDeclaration.get());
+                                }
                             }
                         }
                     }
@@ -276,7 +289,7 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
                 preloadTestResourceClasses(inspectionClass);
                 QuarkusClassLoader runtimeClassLoader = getQuarkusClassLoader(inspectionClass, profile);
                 System.out.println("HOLLY made classloader " + runtimeClassLoader);
-                Class clazz = runtimeClassLoader.loadClass(name);
+                Class<?> clazz = runtimeClassLoader.loadClass(name);
                 System.out.println("HOLLY did load " + clazz + " using CL " + clazz.getClassLoader());
 
                 return clazz;
@@ -296,6 +309,20 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
             throw new RuntimeException(e);
         }
 
+    }
+
+    private boolean isDisabledOnOs(Class<?> inspectionClass) {
+        Optional<? extends Annotation> ma = AnnotationSupport.findAnnotation(inspectionClass, disabledOnOsAnnotation);
+        if (ma.isPresent()) {
+            Annotation a = ma.get();
+            try {
+                OS[] values = (OS[]) disabledOnOsAnnotationValue.invoke(a);
+                return Arrays.stream(values).anyMatch(OS::isCurrentOs);
+            } catch (IllegalAccessException | InvocationTargetException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        return false;
     }
 
     private boolean registersQuarkusTestExtensionWithExtendsWith(Class<?> inspectionClass) {
@@ -330,7 +357,7 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
                 Method m = a
                         .getClass()
                         .getMethod(VALUE);
-                Class resourceClass = (Class) m.invoke(a);
+                Class<?> resourceClass = (Class<?>) m.invoke(a);
                 // Only do this hack for the resources we know need it, since it can cause failures in other areas
                 if (resourceClass.getName().contains("Kubernetes")) {
                     getParent().loadClass(resourceClass.getName());
@@ -363,7 +390,7 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
 
     }
 
-    private QuarkusClassLoader getQuarkusClassLoader(Class requiredTestClass, Class<?> profile) {
+    private QuarkusClassLoader getQuarkusClassLoader(Class<?> requiredTestClass, Class<?> profile) {
         final String profileName = profile != null ? profile.getName() : NO_PROFILE;
         String profileKey = KEY_PREFIX + profileName;
 
@@ -414,7 +441,7 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
         }
     }
 
-    private String getResourceKey(Class<?> requiredTestClass, Class profile)
+    private String getResourceKey(Class<?> requiredTestClass, Class<?> profile)
             throws NoSuchMethodException, ClassNotFoundException, IllegalAccessException, InvocationTargetException {
 
         String resourceKey;
@@ -443,7 +470,7 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
         return resourceKey;
     }
 
-    private StartupAction makeClassLoader(String key, Class requiredTestClass, Class profile) throws Exception {
+    private StartupAction makeClassLoader(String key, Class<?> requiredTestClass, Class<?> profile) throws Exception {
 
         AppMakerHelper appMakerHelper = new AppMakerHelper();
 
@@ -460,7 +487,6 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
 
         }
 
-        // TODO are all these args used?
         StartupAction startupAction = appMakerHelper.getStartupAction(requiredTestClass,
                 curatedApplication, isAuxiliaryApplication, profile);
 
