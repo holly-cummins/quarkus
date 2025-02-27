@@ -1,11 +1,11 @@
 package io.quarkus.it.opentelemetry;
 
-import io.quarkus.test.junit.TestProfile;
 import org.junit.jupiter.api.Test;
 
 import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
+import io.quarkus.test.junit.TestProfile;
 
 @QuarkusTest
 @QuarkusTestResource(value = OracleLifecycleManager.class, restrictToAnnotatedClass = true)
