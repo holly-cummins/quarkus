@@ -37,7 +37,9 @@ public class PostgreSqlLifecycleManager implements QuarkusTestResourceLifecycleM
 
     @Override
     public void stop() {
+        System.out.println("HOLLY WAHOO stopping postgres container");
         postgresContainer.stop();
+        System.out.println("HOLLY WOHOO done stopping postgres container");
     }
 
     private static final class StartedPostgresContainer extends PostgreSQLContainer<StartedPostgresContainer> {
