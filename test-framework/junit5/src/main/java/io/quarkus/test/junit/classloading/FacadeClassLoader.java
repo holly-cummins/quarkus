@@ -4,6 +4,7 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -79,6 +80,8 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
     private final URLClassLoader peekingClassLoader;
 
     // Ideally these would be final, but we initialise them in a try-catch block and sometimes they will be caught
+    private Class<?> osClass;
+    private Method osIsCurrent;
     private Class<? extends Annotation> quarkusTestAnnotation;
     private Class<? extends Annotation> disabledAnnotation;
     private Class<? extends Annotation> disabledOnOsAnnotation;
@@ -171,10 +174,13 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
 
         // In the isolated classloader case, we actually never discover any quarkus tests, and a new instance gets created;
         // but to be safe, initialise our instance variables. We can't use the peekingClassLoader because it can't see JUnit classes, so just use the parent
+        // We have to use reflection because the peekingclassloader may have different versions of the JUnit classes than this class, especially when running with gradle
         try {
             extendWithAnnotation = (Class<? extends Annotation>) annotationLoader.loadClass(ExtendWith.class.getName());
             disabledAnnotation = (Class<? extends Annotation>) annotationLoader.loadClass(Disabled.class.getName());
             disabledOnOsAnnotation = (Class<? extends Annotation>) annotationLoader.loadClass(DisabledOnOs.class.getName());
+            osClass = (Class<?>) annotationLoader.loadClass(OS.class.getName());
+            osIsCurrent = osClass.getMethod("isCurrentOs");
             disabledOnOsAnnotationValue = disabledOnOsAnnotation.getMethod("value");
             registerExtensionAnnotation = (Class<? extends Annotation>) annotationLoader
                     .loadClass(RegisterExtension.class.getName());
@@ -236,7 +242,6 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
 
             } else {
                 if (quarkusTestAnnotation != null) {
-
                     // If it's not continuous testing, we need to load everything in order to decide if it's a QuarkusTest
                     try {
                         inspectionClass = peekingClassLoader.loadClass(name);
@@ -316,8 +321,17 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
         if (ma.isPresent()) {
             Annotation a = ma.get();
             try {
-                OS[] values = (OS[]) disabledOnOsAnnotationValue.invoke(a);
-                return Arrays.stream(values).anyMatch(OS::isCurrentOs);
+                Object values = disabledOnOsAnnotationValue.invoke(a);
+                if (values.getClass().isArray()) {
+                    int length = Array.getLength(values);
+                    for (int i = 0; i < length; i++) {
+                        Object value = Array.get(values, i); // an OS, but we can't cast to it because it's in a different classloader
+                        boolean matches = (boolean) osIsCurrent.invoke(value);
+                        if (matches) {
+                            return true;
+                        }
+                    }
+                }
             } catch (IllegalAccessException | InvocationTargetException e) {
                 throw new RuntimeException(e);
             }
