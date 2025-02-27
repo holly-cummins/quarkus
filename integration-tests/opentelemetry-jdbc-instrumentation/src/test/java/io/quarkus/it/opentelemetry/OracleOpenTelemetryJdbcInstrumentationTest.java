@@ -9,7 +9,7 @@ import io.quarkus.test.junit.TestProfile;
 
 @QuarkusTest
 @QuarkusTestResource(value = OracleLifecycleManager.class, restrictToAnnotatedClass = true)
-// TODO between Feb 4th and 17th something changed which meant postgres state is contaminating the ability to connect to Oracle if everything shares a ClassLoader
+// TODO See https://github.com/quarkusio/quarkus/issues/46542; this profile should not be needed
 @TestProfile(OracleOpenTelemetryJdbcInstrumentationTest.SomeProfile.class)
 public class OracleOpenTelemetryJdbcInstrumentationTest extends OpenTelemetryJdbcInstrumentationTest {
 
