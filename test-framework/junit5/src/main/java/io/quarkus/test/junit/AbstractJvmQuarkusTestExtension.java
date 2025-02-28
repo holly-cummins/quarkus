@@ -34,9 +34,9 @@ import io.quarkus.bootstrap.resolver.AppModelResolverException;
 import io.quarkus.bootstrap.runner.Timing;
 import io.quarkus.bootstrap.utils.BuildToolHelper;
 import io.quarkus.deployment.dev.testing.TestConfig;
+import io.quarkus.logging.Log;
 import io.quarkus.runtime.LaunchMode;
 import io.quarkus.test.common.RestorableSystemProperties;
-import io.quarkus.test.junit.classloading.FacadeClassLoader;
 import io.smallrye.config.SmallRyeConfig;
 
 public class AbstractJvmQuarkusTestExtension extends AbstractQuarkusTestWithContextExtension
@@ -256,87 +256,40 @@ public class AbstractJvmQuarkusTestExtension extends AbstractQuarkusTestWithCont
         if (context.getTestInstance().isPresent()) {
             return ConditionEvaluationResult.enabled("Quarkus Test Profile tags only affect classes");
         }
-        System.out.println("OK comparing TCCL " + Thread.currentThread().getContextClassLoader());
-        System.out.println("OK me " + this.getClass().getClassLoader());
-
-        // TODO this should not be necessary, because we want the config provider to be for our class
-        // TODO stale comments below
-        // At this point, the TCCL is usually the FacadeClassLoader; trying to do getConfig with that TCCL fails with java.util.ServiceConfigurationError: io.smallrye.config.SmallRyeConfigFactory: io.quarkus.runtime.configuration.QuarkusConfigFactory not a subtype
-        // If we set the TCCL to be this.getClass().getClassLoader(), get config succeeds, but config.getConfigMapping(TestConfig.class) fails, because the mapping was registered when the TCCL was the FacadeClassLoader
-        // TODO end of stale comments
 
         // At this point, the TCCL is usually the FacadeClassLoader, but sometimes it's a deployment classloader (for multimodule tests), or the runtime classloader (for nested tests)
-        // Getting back to the FacadeClassLoader is non-trivial. We can't use a simple singleton on the class, because we will be accessing it from different classloaders.
+        // Getting back to the FacadeClassLoader is non-trivial. We can't use the singleton on the class, because we will be accessing it from different classloaders.
         // We can't have a hook back from the runtime classloader to the facade classloader, because
         // when evaluating execution conditions for native tests, the test will have been loaded with the system classloader, not the runtime classloader.
         // The one classloader we can reliably get to when evaluating test execution is the system classloader, so hook our config on that.
-        // However, in native mode tests, a testconfig will not have been registered on the system classloader with a testconfig instance of our classloader, so in those cases, we do not want to set the TCCL
-        // TODO all this complexity of setting TCCLs could be avoided if we were able to reliably have the facade CL as our TCCL when hitting this method; some things should be setting it back and are not
-        // TODO we could also register twice in facade, and do it as a try-catch, is that better?
 
         // To avoid instanceof check, check for the system classloader instead of checking for the quarkusclassloader
         boolean isRunningOnSystem = this.getClass().getClassLoader() == ClassLoader.getSystemClassLoader();
 
-        ClassLoader original = Thread.currentThread()
-                .getContextClassLoader();
+        ClassLoader original = Thread.currentThread().getContextClassLoader();
 
-        // TODO why didn't we want to do this switch on the system path?
+        // In native mode tests, a testconfig will not have been registered on the system classloader with a testconfig instance of our classloader, so in those cases, we do not want to set the TCCL
         if (!isRunningOnSystem) {
-
-            //        Thread.currentThread().setContextClassLoader(this.getClass().getClassLoader());
-            Thread.currentThread()
-                    .setContextClassLoader(ClassLoader.getSystemClassLoader());
+            Thread.currentThread().setContextClassLoader(ClassLoader.getSystemClassLoader());
         }
-
-        //        SmallRyeConfig config = ConfigProvider.getConfig().unwrap(SmallRyeConfig.class);
-        //        TestConfig testConfig = config.getConfigMapping(TestConfig.class);
 
         TestConfig testConfig;
         try {
-            System.out.println("HOLLY CONFIG PUZZLE about to try to get config with TCCL "
-                    + Thread.currentThread().getContextClassLoader());
+
             testConfig = ConfigProvider.getConfig()
                     .unwrap(SmallRyeConfig.class)
                     .getConfigMapping(TestConfig.class);
-            System.out.println(
-                    "HOLLY CONFIG PUZZLE done getting config with TCCL " + Thread.currentThread().getContextClassLoader());
-        } catch (Error | RuntimeException e) {
-            System.out.println("HOLLY CONFIG IN THE CATCH");
-
-            System.out.println("HOLLY CONFIG DOOM " + e);
-            System.out.println("HOLLY CONFIG consuming The TCCL in use is " + Thread.currentThread().getContextClassLoader());
-            System.out
-                    .println("HOLLY CONFIG the class of the class we use for mapping is " + TestConfig.class.getClassLoader());
-
-            // TODO this works, but it's too ugly to ship
-            // We should probably swap round where FCL registers its stuff, not set a TCCL here on the default path, and track down all the places where the CL does not get correctly reset to the Facade CL
-            Thread.currentThread().setContextClassLoader(FacadeClassLoader.instance(ClassLoader.getSystemClassLoader()));
-            try {
-                testConfig = ConfigProvider.getConfig()
-                        .unwrap(SmallRyeConfig.class)
-                        .getConfigMapping(TestConfig.class);
-            } catch (Error | RuntimeException e1) {
-                System.out.println("HOLLY CONFIG DOUBLE DOOM");
-                try {
-                    System.out.println("With the TCCL, it is " + Thread.currentThread().getContextClassLoader()
-                            .loadClass("io.quarkus.runtime.configuration.QuarkusConfigFactory").getClassLoader());
-                    System.out.println("HOLLY the thing we want to cast it to is " + SmallRyeConfig.class.getClassLoader());
-                    Thread.currentThread().setContextClassLoader(this.getClass().getClassLoader());
-                    System.out.println(
-                            "HOLLY CONFIG desperately setting it to " + Thread.currentThread().getContextClassLoader());
-                    testConfig = ConfigProvider.getConfig()
-                            .unwrap(SmallRyeConfig.class)
-                            .getConfigMapping(TestConfig.class);
-                } catch (ClassNotFoundException ex) {
-                    throw new RuntimeException(ex);
-                }
-            }
-
-            // throw e;
+        } catch (Exception e) {
+            // Tracked by https://github.com/quarkusio/quarkus/issues/46048
+            Log.error("Could not read configuration while evaluating whether to run " + context.getRequiredTestClass()
+                    + ". This usually happens when re-running a test that has already failed, for example if surefire.rerunFailingTestsCount is set. To work around this limitation, either adjust the test so that it passes, or isolate the test into a project whose tests all use the same combination of @TestProfile and resources.");
+            Log.debug("Underlying exception: " + e);
+            Log.debug("Thread Context Classloader: " + Thread.currentThread().getContextClassLoader());
+            Log.debug("The class of the class we use for mapping is " + TestConfig.class.getClassLoader());
+            throw new IllegalStateException("Non-viable test classloader. Is this a re-run of a failing test?");
         } finally {
             if (!isRunningOnSystem) {
-                Thread.currentThread()
-                        .setContextClassLoader(original);
+                Thread.currentThread().setContextClassLoader(original);
             }
         }
 

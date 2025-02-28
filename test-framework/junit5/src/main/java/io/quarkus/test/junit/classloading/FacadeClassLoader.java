@@ -539,6 +539,10 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
 
     @Override
     public void close() {
+
+        // Remove references to this classloader, so they don't hang around consuming metaspace
+        clearSingleton();
+
         for (CuratedApplication curatedApplication : curatedApplications.values()) {
             curatedApplication.close();
         }
