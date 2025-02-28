@@ -756,8 +756,7 @@ public class JunitTestRunner {
         List<Class<?>> itClasses = new ArrayList<>();
         List<Class<?>> utClasses = new ArrayList<>();
 
-        // TODO guard to only do this once? is this guard sufficient? see "wrongprofile" in QuarkusTestExtension
-        ClassLoader testLoadingClassLoader;
+        ClassLoader classLoaderForLoadingTests;
         try {
             Class fclClazz = Thread.currentThread()
                     .getContextClassLoader()
@@ -771,20 +770,19 @@ public class JunitTestRunner {
             // Passing in the test classes is necessary because in dev mode getAnnotations() on the class returns an empty array, for some reason (plus it saves rediscovery effort)
             String classPath = moduleInfo.getMain()
                     .getClassesPath() + File.pathSeparator + moduleInfo.getTest().get().getClassesPath();
-            testLoadingClassLoader = (ClassLoader) instance.invoke(null, Thread.currentThread()
+            classLoaderForLoadingTests = (ClassLoader) instance.invoke(null, Thread.currentThread()
                     .getContextClassLoader(), true, profiles, quarkusTestClassesForFacadeClassLoader, classPath);
 
             Thread.currentThread()
-                    .setContextClassLoader(testLoadingClassLoader);
+                    .setContextClassLoader(classLoaderForLoadingTests);
         } catch (ClassNotFoundException | NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
-            e.printStackTrace(); // TODO remove this
             // This is fine, and usually just means that test-framework/junit5 isn't one of the project dependencies
             // In that case, fallback to loading classes as we normally would, using a TCCL
             Log.debug(
                     "Could not load class for FacadeClassLoader. This might be because quarkus-junit5 is not on the project classpath: "
                             + e);
 
-            testLoadingClassLoader = Thread.currentThread()
+            classLoaderForLoadingTests = Thread.currentThread()
                     .getContextClassLoader();
         }
 
@@ -793,7 +791,7 @@ public class JunitTestRunner {
                 // We could load these classes directly, since we know the profile and we have a handy interception point;
                 // but we need to signal to the downstream interceptor that it shouldn't interfere with the classloading
                 // While we're doing that, we may as well share the classloading logic
-                itClasses.add(testLoadingClassLoader.loadClass(i));
+                itClasses.add(classLoaderForLoadingTests.loadClass(i));
             } catch (Exception e) {
                 // TODO how handle this?
                 e.printStackTrace();
