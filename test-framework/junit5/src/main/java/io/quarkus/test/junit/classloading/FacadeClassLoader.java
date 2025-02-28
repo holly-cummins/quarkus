@@ -541,7 +541,8 @@ public class FacadeClassLoader extends ClassLoader implements Closeable {
     public void close() {
 
         // Remove references to this classloader, so they don't hang around consuming metaspace
-        clearSingleton();
+        // ... but don't use the method, or we get a stackoverflow
+        FacadeClassLoader.instance = null;
 
         for (CuratedApplication curatedApplication : curatedApplications.values()) {
             curatedApplication.close();
