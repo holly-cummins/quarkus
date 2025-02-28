@@ -17,75 +17,66 @@ public class QuarkusTestExtensionState implements ExtensionContext.Store.Closeab
     protected final Closeable testResourceManager;
     protected final Closeable resource;
     private Thread shutdownHook;
-    // TODO sort this out on the clone
     private final Runnable clearCallbacks;
     private Throwable testErrorCause;
 
-    // NewSerializingDeepClone can't clone this
+    // We need to move this between classloaders, and NewSerializingDeepClone can't clone this
+    // Instead, clone by brute force and knowledge of internals
     public static QuarkusTestExtensionState clone(Object state) {
         try {
-            Method trmm = state.getClass()
-                    .getMethod("testResourceManager");
+            Class<?> clazz = state.getClass();
+            Method trmm = clazz.getMethod("getTestResourceManager");
             Closeable trm = (Closeable) trmm.invoke(state);
-            Method rmm = state.getClass()
-                    .getMethod("resource");
+
+            Method rmm = clazz.getMethod("getResource");
             Closeable resource = (Closeable) rmm.invoke(state);
 
-            Method shm = state.getClass()
-                    .getMethod("shutdownHook");
+            Method shm = clazz.getMethod("getShutdownHook");
             Thread shutdownHook = (Thread) shm.invoke(state);
 
-            // TODO this is almost certainly wrong because we'll be getting a runner in the wrong classloader, but we need to think about what the right behaviour is here
-            // Do nothing because the issue is fixed? Get the method name of the runner and bridge it across to this classloader?
-            //  See https://github.com/quarkusio/quarkus/pull/44279#issuecomment-2548561806
-            Method ccm = state.getClass()
-                    .getMethod("clearCallbacksRunner");
+            Method ccm = clazz.getMethod("getClearCallbacksRunner");
             Runnable clearCallbacks = (Runnable) ccm.invoke(state);
 
-            // TODO find a clean mechanism for cloning subclasses that isn't hardcoding; reflectively doing a class forName and assuming the correct constructor exists
-            if (state.getClass()
+            // This is a bit icky; we could avoid the hardcoding if we would reflectively do a class forName and assume the correct constructor exists, but I'm not sure that's much better
+            if (clazz
                     .getName()
                     .equals(QuarkusTestExtension.ExtensionState.class.getName())) {
                 QuarkusTestExtensionState answer = new QuarkusTestExtension.ExtensionState(trm, resource, clearCallbacks,
                         shutdownHook);
                 return answer;
-            } else if (state.getClass()
+            } else if (clazz
                     .getName()
                     .equals(QuarkusTestExtensionState.class.getName())) {
                 QuarkusTestExtensionState answer = new QuarkusTestExtensionState(trm, resource, clearCallbacks, shutdownHook);
                 return answer;
             } else {
-                throw new RuntimeException("Not implemented. Cannot clone a state subclass of " + state.getClass());
+                throw new UnsupportedOperationException(
+                        "Not implemented. Cannot clone a state subclass of " + clazz);
             }
 
-        } catch (NoSuchMethodException e) {
-            throw new RuntimeException(e);
-        } catch (InvocationTargetException e) {
-            throw new RuntimeException(e);
-        } catch (IllegalAccessException e) {
+        } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException e) {
             throw new RuntimeException(e);
         }
 
     }
 
-    // TODO #store
-
-    // TODO can these be more private
-    public Closeable testResourceManager() {
+    // Used reflectively
+    public Closeable getTestResourceManager() {
         return testResourceManager;
     }
 
-    public Closeable resource() {
+    // Used reflectively
+    public Closeable getResource() {
         return resource;
     }
 
     // Used reflectively
-    public Thread shutdownHook() {
+    public Thread getShutdownHook() {
         return shutdownHook;
     }
 
     // Used reflectively
-    public Runnable clearCallbacksRunner() {
+    public Runnable getClearCallbacksRunner() {
         return clearCallbacks;
     }
 

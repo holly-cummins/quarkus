@@ -7,6 +7,8 @@ import org.junit.jupiter.api.extension.LifecycleMethodExecutionExceptionHandler;
 import org.junit.jupiter.api.extension.TestExecutionExceptionHandler;
 import org.junit.jupiter.api.extension.TestWatcher;
 
+import io.quarkus.logging.Log;
+
 public abstract class AbstractQuarkusTestWithContextExtension extends AbstractTestWithCallbacksExtension
         implements TestExecutionExceptionHandler, LifecycleMethodExecutionExceptionHandler, TestWatcher {
 
@@ -55,14 +57,11 @@ public abstract class AbstractQuarkusTestWithContextExtension extends AbstractTe
     protected QuarkusTestExtensionState getState(ExtensionContext context) {
         ExtensionContext.Store store = getStoreFromContext(context);
         Object o = store.get(QuarkusTestExtensionState.class.getName());
-        //    QuarkusTestExtensionState state = store.get(QuarkusTestExtensionState.class.getName(), QuarkusTestExtensionState.class);
         if (o != null) {
-            //            QuarkusTestExtensionState state = (QuarkusTestExtensionState) new NewSerializingDeepClone(
-            //                    o.getClass().getClassLoader(),
-            //                    this.getClass().getClassLoader()).clone(o);
 
             QuarkusTestExtensionState state;
 
+            // It's quite possible the state was created in another classloader, and if so, we will need to clone it across into this classloader
             if (o instanceof QuarkusTestExtensionState) {
                 state = (QuarkusTestExtensionState) o;
             } else {
@@ -74,10 +73,9 @@ public abstract class AbstractQuarkusTestWithContextExtension extends AbstractTe
                 // The current state was created by a different testing type, so we need to renew it, so the new state is
                 // compatible with the current testing type.
                 try {
-                    //                    Method closeMethod = state.getClass().getMethod("close");
-                    //                    closeMethod.invoke(state);
                     state.close();
                 } catch (IOException ignored) {
+                    Log.debug(ignored);
                     // ignoring exceptions when closing state.
 
                 } finally {

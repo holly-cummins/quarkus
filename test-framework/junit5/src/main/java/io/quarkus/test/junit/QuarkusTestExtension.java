@@ -5,7 +5,6 @@ import static io.quarkus.test.common.PathTestHelper.getTestClassesLocation;
 import static io.quarkus.test.junit.IntegrationTestUtil.activateLogging;
 
 import java.io.Closeable;
-import java.lang.annotation.Annotation;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadInfo;
 import java.lang.reflect.Constructor;
@@ -18,7 +17,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.AbstractMap;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
@@ -40,15 +38,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.function.Predicate;
 
 import org.eclipse.microprofile.config.spi.ConfigProviderResolver;
-import org.jboss.jandex.AnnotationInstance;
-import org.jboss.jandex.AnnotationTarget;
-import org.jboss.jandex.ClassInfo;
-import org.jboss.jandex.FieldInfo;
-import org.jboss.jandex.Index;
-import org.jboss.jandex.Type;
 import org.jboss.logging.Logger;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.extension.AfterAllCallback;
@@ -69,14 +60,6 @@ import org.opentest4j.TestAbortedException;
 import io.quarkus.bootstrap.app.StartupAction;
 import io.quarkus.bootstrap.classloading.QuarkusClassLoader;
 import io.quarkus.bootstrap.logging.InitialConfigurator;
-import io.quarkus.builder.BuildChainBuilder;
-import io.quarkus.builder.BuildContext;
-import io.quarkus.builder.BuildStep;
-import io.quarkus.deployment.builditem.ApplicationClassPredicateBuildItem;
-import io.quarkus.deployment.builditem.TestAnnotationBuildItem;
-import io.quarkus.deployment.builditem.TestClassBeanBuildItem;
-import io.quarkus.deployment.builditem.TestClassPredicateBuildItem;
-import io.quarkus.deployment.builditem.TestProfileBuildItem;
 import io.quarkus.dev.testing.ExceptionReporting;
 import io.quarkus.dev.testing.TracingHandler;
 import io.quarkus.runtime.ApplicationLifecycleManager;
@@ -86,7 +69,6 @@ import io.quarkus.runtime.logging.JBossVersion;
 import io.quarkus.runtime.test.TestHttpEndpointProvider;
 import io.quarkus.test.TestMethodInvoker;
 import io.quarkus.test.common.GroovyClassValue;
-import io.quarkus.test.common.PathTestHelper;
 import io.quarkus.test.common.PropertyTestUtil;
 import io.quarkus.test.common.RestAssuredURLManager;
 import io.quarkus.test.common.RestorableSystemProperties;
@@ -95,7 +77,6 @@ import io.quarkus.test.common.TestResourceManager;
 import io.quarkus.test.common.TestScopeManager;
 import io.quarkus.test.common.http.TestHTTPEndpoint;
 import io.quarkus.test.common.http.TestHTTPResourceManager;
-import io.quarkus.test.junit.buildchain.TestBuildChainCustomizerProducer;
 import io.quarkus.test.junit.callback.QuarkusTestContext;
 import io.quarkus.test.junit.callback.QuarkusTestMethodContext;
 import io.smallrye.config.SmallRyeConfigProviderResolver;
@@ -467,32 +448,19 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
         }
     }
 
-    public static String getEndpointPath(ExtensionContext context, List<Function<Class<?>, String>> testHttpEndpointProviders)
-            throws ClassNotFoundException {
+    public static String getEndpointPath(ExtensionContext context, List<Function<Class<?>, String>> testHttpEndpointProviders) {
         String endpointPath = null;
-        System.out
-                .println("HOLLY QTE sees annotations is " + Arrays.toString(context.getRequiredTestMethod().getAnnotations()));
 
-        // TestHTTPEndpoint testHTTPEndpoint = context.getRequiredTestMethod().getAnnotation(TestHTTPEndpoint.class);
-        // TODO #store
-        // TODO this reflection can be reverted if the CL is the test's CL
-        Annotation[] annotations = context.getRequiredTestMethod().getAnnotations();
-        Annotation testHTTPEndpoint = null;
-        Class testHTTPEndpointClazz = context.getRequiredTestClass().getClassLoader()
-                .loadClass(TestHTTPEndpoint.class.getName());
-        for (Annotation annotation : annotations) {
-            if (annotation.annotationType().getName().equals(TestHTTPEndpoint.class.getName())) {
-                testHTTPEndpoint = annotation;
+        TestHTTPEndpoint testHTTPEndpoint = context.getRequiredTestMethod().getAnnotation(TestHTTPEndpoint.class);
 
-            }
-        }
-
+        // TODO we can use JUnit's AnnotationSupport to simplify searching the hierarchy
+        //TODO we should also be able to bypass all the reflection here
         System.out.println("endpoint is " + testHTTPEndpoint);
         if (testHTTPEndpoint == null) {
             Class<?> clazz = context.getRequiredTestClass();
             while (true) {
                 // go up the hierarchy because most Native tests extend from a regular Quarkus test
-                testHTTPEndpoint = clazz.getAnnotation(testHTTPEndpointClazz);
+                testHTTPEndpoint = clazz.getAnnotation(TestHTTPEndpoint.class);
                 if (testHTTPEndpoint != null) {
                     break;
                 }
@@ -509,7 +477,7 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
 
                 // TODO #store
                 try {
-                    Method m = testHTTPEndpointClazz.getMethod("value");
+                    Method m = TestHTTPEndpoint.class.getMethod("value");
 
                     value = m.invoke(testHTTPEndpoint);
 
@@ -898,11 +866,7 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
     private void initTestState(ExtensionContext extensionContext, QuarkusTestExtensionState state) {
         System.out.println("HOLLY initTestState");
         try {
-            //            actualTestClass = Class.forName(extensionContext.getRequiredTestClass().getName(), true,
-            //                    Thread.currentThread().getContextClassLoader());
-            // Do not reload the test class
             actualTestClass = extensionContext.getRequiredTestClass();
-
             if (extensionContext.getRequiredTestClass().isAnnotationPresent(Nested.class)) {
                 Class<?> outerClass = actualTestClass.getEnclosingClass();
                 Constructor<?> declaredConstructor = actualTestClass.getDeclaredConstructor(outerClass);
@@ -930,8 +894,6 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
 
     private Object createActualTestInstance(Class<?> testClass, QuarkusTestExtensionState state)
             throws ClassNotFoundException, IllegalAccessException, InvocationTargetException, NoSuchMethodException {
-        System.out.println(
-                "HOLLY creating actual test instance " + testClass + " TCCL " + Thread.currentThread().getContextClassLoader());
         Object testInstance = runningQuarkusApplication.instance(testClass);
 
         Class<?> resM = Thread.currentThread().getContextClassLoader().loadClass(TestHTTPResourceManager.class.getName());
@@ -1061,8 +1023,6 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
 
         ClassLoader old = setCCL(runningQuarkusApplication.getClassLoader());
         try {
-            //            Class<?> testClassFromTCCL = Class.forName(extensionContext.getRequiredTestClass().getName(), true,
-            //                    Thread.currentThread().getContextClassLoader());
             Class<?> testClassFromTCCL = extensionContext.getRequiredTestClass();
             Map<Class<?>, Object> allTestsClasses = new HashMap<>();
             // static loading
@@ -1191,7 +1151,6 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
             if (!isNativeOrIntegrationTest(context.getRequiredTestClass()) && (runningQuarkusApplication != null)) {
                 popMockContext();
             }
-            System.out.println("afterAll HOLLY TCCL will reset " + originalCl);
             if (originalCl != null) {
                 setCCL(originalCl);
             }
@@ -1334,119 +1293,6 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
             firstException = null;
             failedBoot = false;
             ConfigProviderResolver.setInstance(null);
-        }
-    }
-
-    public static class TestBuildChainFunction implements Function<Map<String, Object>, List<Consumer<BuildChainBuilder>>> {
-
-        @Override
-        public List<Consumer<BuildChainBuilder>> apply(Map<String, Object> stringObjectMap) {
-            Path testLocation = (Path) stringObjectMap.get(TEST_LOCATION);
-            // the index was written by the extension
-            Index testClassesIndex = TestClassIndexer.readIndex(testLocation, (Class<?>) stringObjectMap.get(TEST_CLASS));
-
-            List<Consumer<BuildChainBuilder>> allCustomizers = new ArrayList<>(1);
-            Consumer<BuildChainBuilder> defaultCustomizer = new Consumer<BuildChainBuilder>() {
-
-                @Override
-                public void accept(BuildChainBuilder buildChainBuilder) {
-                    buildChainBuilder.addBuildStep(new BuildStep() {
-                        @Override
-                        public void execute(BuildContext context) {
-                            context.produce(new TestClassPredicateBuildItem(new Predicate<String>() {
-                                @Override
-                                public boolean test(String className) {
-                                    return PathTestHelper.isTestClass(className,
-                                            Thread.currentThread().getContextClassLoader(), testLocation);
-                                }
-                            }));
-                        }
-                    }).produces(TestClassPredicateBuildItem.class)
-                            .build();
-                    buildChainBuilder.addBuildStep(new BuildStep() {
-                        @Override
-                        public void execute(BuildContext context) {
-                            //we need to make sure all hot reloadable classes are application classes
-                            context.produce(new ApplicationClassPredicateBuildItem(new Predicate<String>() {
-                                @Override
-                                public boolean test(String className) {
-                                    return QuarkusClassLoader.isApplicationClass(className);
-                                }
-                            }));
-                        }
-                    }).produces(ApplicationClassPredicateBuildItem.class).build();
-                    buildChainBuilder.addBuildStep(new BuildStep() {
-                        @Override
-                        public void execute(BuildContext context) {
-                            context.produce(new TestAnnotationBuildItem(QuarkusTest.class.getName()));
-                        }
-                    }).produces(TestAnnotationBuildItem.class)
-                            .build();
-
-                    List<String> testClassBeans = new ArrayList<>();
-
-                    List<AnnotationInstance> extendWith = testClassesIndex
-                            .getAnnotations(DotNames.EXTEND_WITH);
-                    for (AnnotationInstance annotationInstance : extendWith) {
-                        if (annotationInstance.target().kind() != AnnotationTarget.Kind.CLASS) {
-                            continue;
-                        }
-                        ClassInfo classInfo = annotationInstance.target().asClass();
-                        if (classInfo.isAnnotation()) {
-                            continue;
-                        }
-                        Type[] extendsWithTypes = annotationInstance.value().asClassArray();
-                        for (Type type : extendsWithTypes) {
-                            if (DotNames.QUARKUS_TEST_EXTENSION.equals(type.name())) {
-                                testClassBeans.add(classInfo.name().toString());
-                            }
-                        }
-                    }
-
-                    List<AnnotationInstance> registerExtension = testClassesIndex.getAnnotations(DotNames.REGISTER_EXTENSION);
-                    for (AnnotationInstance annotationInstance : registerExtension) {
-                        if (annotationInstance.target().kind() != AnnotationTarget.Kind.FIELD) {
-                            continue;
-                        }
-                        FieldInfo fieldInfo = annotationInstance.target().asField();
-                        if (DotNames.QUARKUS_TEST_EXTENSION.equals(fieldInfo.type().name())) {
-                            testClassBeans.add(fieldInfo.declaringClass().name().toString());
-                        }
-                    }
-
-                    if (!testClassBeans.isEmpty()) {
-                        buildChainBuilder.addBuildStep(new BuildStep() {
-                            @Override
-                            public void execute(BuildContext context) {
-                                for (String quarkusExtendWithTestClass : testClassBeans) {
-                                    context.produce(new TestClassBeanBuildItem(quarkusExtendWithTestClass));
-                                }
-                            }
-                        }).produces(TestClassBeanBuildItem.class)
-                                .build();
-                    }
-
-                    buildChainBuilder.addBuildStep(new BuildStep() {
-                        @Override
-                        public void execute(BuildContext context) {
-                            Object testProfile = stringObjectMap.get(TEST_PROFILE);
-                            if (testProfile != null) {
-                                context.produce(new TestProfileBuildItem(testProfile.toString()));
-                            }
-                        }
-                    }).produces(TestProfileBuildItem.class).build();
-
-                }
-            };
-            allCustomizers.add(defaultCustomizer);
-
-            // give other extensions the ability to customize the build chain
-            for (TestBuildChainCustomizerProducer testBuildChainCustomizerProducer : ServiceLoader
-                    .load(TestBuildChainCustomizerProducer.class, this.getClass().getClassLoader())) {
-                allCustomizers.add(testBuildChainCustomizerProducer.produce(testClassesIndex));
-            }
-
-            return allCustomizers;
         }
     }
 
