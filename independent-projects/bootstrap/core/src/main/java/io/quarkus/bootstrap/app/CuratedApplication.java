@@ -453,6 +453,8 @@ public class CuratedApplication implements Serializable, AutoCloseable {
 
     @Override
     public void close() {
+        new Exception("who closed me?").printStackTrace();
+
         if (augmentClassLoader != null) {
             augmentClassLoader.close();
             augmentClassLoader = null;
