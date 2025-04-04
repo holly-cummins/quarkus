@@ -97,9 +97,11 @@ public class QuarkusAugmentor {
         long start = System.nanoTime();
         log.debug("Beginning Quarkus augmentation");
         ClassLoader originalClassLoader = Thread.currentThread().getContextClassLoader();
+        System.out.println("HOLLY augmentor seees" + originalClassLoader);
         QuarkusBuildCloseablesBuildItem buildCloseables = new QuarkusBuildCloseablesBuildItem();
         try {
             Thread.currentThread().setContextClassLoader(deploymentClassLoader);
+            System.out.println("HOLLY setting it to " + deploymentClassLoader);
 
             final BuildChainBuilder chainBuilder = BuildChain.builder();
             chainBuilder.setClassLoader(deploymentClassLoader);
@@ -158,7 +160,9 @@ public class QuarkusAugmentor {
             for (PathCollection i : additionalApplicationArchives) {
                 execBuilder.produce(new AdditionalApplicationArchiveBuildItem(i));
             }
+            System.out.println("HOLLY finished babout to execute");
             BuildResult buildResult = execBuilder.execute();
+            System.out.println("HOLLY finished build result");
             String message = "Quarkus augmentation completed in " + TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start)
                     + "ms";
             if (launchMode == LaunchMode.NORMAL) {

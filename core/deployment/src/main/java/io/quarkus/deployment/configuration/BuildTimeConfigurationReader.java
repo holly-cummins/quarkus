@@ -425,6 +425,19 @@ public final class BuildTimeConfigurationReader {
 
         builder.withInterceptors(buildConfigTracker);
         builder.withInterceptors(ConfigCompatibility.FrontEnd.instance(), ConfigCompatibility.BackEnd.instance());
+
+        System.out.println("HOLLY in the gits I AM " + this.getClass().getClassLoader());
+
+        System.out.println("HOLLY in the gits cl " + builder.getClassLoader());
+        System.out.println("HOLLY in the gits classcl " + builder.getClass().getClassLoader());
+
+        System.out.println("HOLLY in the gits TCCL " + Thread.currentThread().getContextClassLoader());
+        //  System.out.println("HOLLY in the gits TCCL " + SmallRyeConfigBuilderCustomize.class.getClassLoader());
+        System.out.println("HOLLY in the gits bcbcbc " + BuildTimeConfigBuilderCustomizer.class.getClassLoader());
+
+        // TODO experiment
+        //        Thread.currentThread().setContextClassLoader(builder.getClass().getClassLoader());
+
         var config = builder.build();
         buildConfigTracker.configure(config);
         return config;

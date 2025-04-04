@@ -227,6 +227,8 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
             populateCallbacks(startupAction.getClassLoader());
             populateTestMethodInvokers(startupAction.getClassLoader());
 
+            startupAction.getAugmentAction().performPrestart();
+
             if (profileInstance == null || !profileInstance.runMainMethod()) {
                 runningQuarkusApplication = startupAction
                         .run(profileInstance == null ? new String[0] : profileInstance.commandLineParameters());
