@@ -384,15 +384,19 @@ public class StartupActionImpl implements StartupAction {
                         }
                     }
             }, runtimeClassLoader);
-        } catch (InvocationTargetException e) {
-            if (e.getCause() instanceof Exception) {
-                throw (Exception) e.getCause();
-            }
-            throw new RuntimeException("Failed to start Quarkus", e.getCause());
-        } finally {
-            Thread.currentThread()
-                    .setContextClassLoader(old);
+        }catch(
+
+    InvocationTargetException e)
+    {
+        if (e.getCause() instanceof Exception) {
+            throw (Exception) e.getCause();
         }
+        throw new RuntimeException("Failed to start Quarkus", e.getCause());
+    }finally
+    {
+        Thread.currentThread()
+                .setContextClassLoader(old);
+    }
 
     }
 
