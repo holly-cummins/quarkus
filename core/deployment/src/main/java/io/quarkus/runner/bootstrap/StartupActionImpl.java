@@ -377,27 +377,21 @@ public class StartupActionImpl implements StartupAction {
                                 .getMode() == QuarkusBootstrap.Mode.TEST &&
                                 !curatedApplication.getQuarkusBootstrap()
                                         .isAuxiliaryApplication()) {
-                                //for tests, we just always shut down the curated application, as it is only used once
-                                //dev mode might be about to restart, so we leave it
-                                curatedApplication.close();
-                            }
+                            //for tests, we just always shut down the curated application, as it is only used once
+                            //dev mode might be about to restart, so we leave it
+                            curatedApplication.close();
                         }
                     }
             }, runtimeClassLoader);
-        }catch(
-
-    InvocationTargetException e)
-    {
-        if (e.getCause() instanceof Exception) {
-            throw (Exception) e.getCause();
+        } catch (InvocationTargetException e) {
+            if (e.getCause() instanceof Exception) {
+                throw (Exception) e.getCause();
+            }
+            throw new RuntimeException("Failed to start Quarkus", e.getCause());
+        } finally {
+            Thread.currentThread()
+                    .setContextClassLoader(old);
         }
-        throw new RuntimeException("Failed to start Quarkus", e.getCause());
-    }finally
-    {
-        Thread.currentThread()
-                .setContextClassLoader(old);
-    }
-
     }
 
     @Override
