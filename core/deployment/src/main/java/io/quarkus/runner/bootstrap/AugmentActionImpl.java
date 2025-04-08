@@ -20,6 +20,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import org.jboss.logging.Logger;
@@ -150,10 +151,18 @@ public class AugmentActionImpl implements AugmentAction {
 
     @Override
     public void performCustomBuild(String resultHandler, Object context, String... finalOutputs) {
+        performCustomBuild(resultHandler, context, false, finalOutputs);
+    }
+
+    // TODO should we always call the filter and always do the second phase?
+
+    public void performCustomBuild(String resultHandler, Object context, boolean skipDevServices, String... finalOutputs) {
+        Predicate<String> filter = skipDevServices ? s -> !isDevServiceBuildItem(s) : s -> true;
+
         System.out.println("HOLLY PERFORMING custom build");
         try (QuarkusClassLoader classLoader = curatedApplication.createDeploymentClassLoader()) {
             Class<? extends BuildItem>[] targets = Arrays.stream(finalOutputs)
-                    .filter(s -> !isDevServiceBuildItem(s))
+                    .filter(filter)
                     .map(new Function<String, Class<? extends BuildItem>>() {
                         @Override
                         public Class<? extends BuildItem> apply(String s) {
@@ -372,8 +381,11 @@ public class AugmentActionImpl implements AugmentAction {
         System.out.println("HOLLY running augment TCCL " + Thread.currentThread().getContextClassLoader());
         System.out.println("HOLLY running augment I AM " + this.getClass().getClassLoader());
 
-        Arrays.stream(finalOutputs)
-                .filter(s -> !isDevServiceBuildItem(s.getName()));
+        // TODO should the filter be here, or in performCustomBuild?
+
+        //        Arrays.stream(finalOutputs)
+        //                .filter(s -> !isDevServiceBuildItem(s.getName()));
+
         Arrays.stream(finalOutputs)
                 .forEach(s -> System.out.println("HOLLY ARGH " + s));
 
