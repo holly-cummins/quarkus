@@ -525,9 +525,7 @@ public final class FacadeClassLoader extends ClassLoader implements Closeable {
 
     private CuratedApplication getOrCreateCuratedApplication(String key, Class<?> requiredTestClass)
             throws IOException, AppModelResolverException, BootstrapException {
-        System.out.println("HOLLY getting curated app for key " + key + " on " + requiredTestClass.getName());
         CuratedApplication curatedApplication = curatedApplications.get(key);
-        System.out.println("HOLLY got one already:  " + curatedApplication);
 
         if (curatedApplication == null) {
             Collection<Runnable> shutdownTasks = new HashSet<>();
