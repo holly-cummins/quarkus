@@ -443,7 +443,7 @@ public final class BuildTimeConfigurationReader {
         // TODO experiment
         ClassLoader old = Thread.currentThread()
                 .getContextClassLoader();
-        Thread.currentThread().setContextClassLoader(SmallRyeConfigBuilderCustomizer.class.getClassLoader());
+        //        Thread.currentThread().setContextClassLoader(SmallRyeConfigBuilderCustomizer.class.getClassLoader());
 
         try {
             var config = builder.build();
