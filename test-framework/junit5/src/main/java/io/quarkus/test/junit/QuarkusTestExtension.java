@@ -628,6 +628,8 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
                 : null;
         boolean isSameCuratedApplication = cl
                 .getCuratedApplication() == curatedApplication;
+        System.out.println("HOLLY compared " + cl.getCuratedApplication() + " and " + curatedApplication);
+        System.out.println("HOLLY running app was " + runningQuarkusApplication);
         System.out.println(
                 "HOLLY " + extensionContext.getRequiredTestClass() + " is same Curated app" + isSameCuratedApplication);
         System.out.println("HOLLY " + extensionContext.getRequiredTestClass() + " is new app" + isNewApplication);

@@ -444,7 +444,6 @@ public final class BuildChainBuilder {
     }
 
     private boolean isDevService(StepInfo stepInfo) {
-        System.out.println("HOLLY chain checking " + stepInfo.getProduces());
         // TODO too crude a check
         return stepInfo.getProduces().stream().anyMatch(i -> i.getType().getName().contains("DevServicesResult"));
     }
