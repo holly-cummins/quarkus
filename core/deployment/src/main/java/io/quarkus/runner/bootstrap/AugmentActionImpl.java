@@ -192,6 +192,7 @@ public class AugmentActionImpl implements AugmentAction {
     }
 
     // TODO there's no evidence that this is ever called, even reflectively
+    // TODO and as it's a new method added in this PR, it should be removed :) 
     public void performPostBuild(String resultHandler, Object context, String... finalOutputs) {
         try (QuarkusClassLoader classLoader = curatedApplication.createDeploymentClassLoader()) {
             Class<? extends BuildItem>[] targets = Arrays.stream(finalOutputs)
@@ -385,9 +386,6 @@ public class AugmentActionImpl implements AugmentAction {
 
         //        Arrays.stream(finalOutputs)
         //                .filter(s -> !isDevServiceBuildItem(s.getName()));
-
-        Arrays.stream(finalOutputs)
-                .forEach(s -> System.out.println("HOLLY ARGH " + s));
 
         ClassLoader old = Thread.currentThread()
                 .getContextClassLoader();

@@ -28,7 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
-import java.util.ServiceConfigurationError;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeMap;
@@ -426,36 +425,9 @@ public final class BuildTimeConfigurationReader {
 
         builder.withInterceptors(buildConfigTracker);
         builder.withInterceptors(ConfigCompatibility.FrontEnd.instance(), ConfigCompatibility.BackEnd.instance());
-
-        System.out.println("HOLLY in the gits I AM " + this.getClass().getClassLoader());
-
-        System.out.println("HOLLY in the gits cl " + builder.getClassLoader());
-        System.out.println("HOLLY in the gits classcl " + builder.getClass().getClassLoader());
-
-        System.out.println("HOLLY in the gits TCCL " + Thread.currentThread().getContextClassLoader());
-        System.out.println("HOLLY in the gits smallrye " + SmallRyeConfigBuilderCustomizer.class.getClassLoader());
-        System.out.println("HOLLY in the gits bcbcbc " + BuildTimeConfigBuilderCustomizer.class.getClassLoader());
-        System.out.println(
-                "HOLLY in the gits bcbcbc parent " + BuildTimeConfigBuilderCustomizer.class.getClassLoader().getParent());
-        System.out.println(
-                "HOLLY in the gits TCCL parent " + Thread.currentThread().getContextClassLoader().getParent());
-
-        // TODO experiment
-        ClassLoader old = Thread.currentThread()
-                .getContextClassLoader();
-        //        Thread.currentThread().setContextClassLoader(SmallRyeConfigBuilderCustomizer.class.getClassLoader());
-
-        try {
-            var config = builder.build();
-            buildConfigTracker.configure(config);
-            return config;
-        } catch (ServiceConfigurationError e) {
-            System.out.println("HOLLY UGH " + e);
-            throw e;
-        } finally {
-            Thread.currentThread().setContextClassLoader(old);
-        }
-
+        var config = builder.build();
+        buildConfigTracker.configure(config);
+        return config;
     }
 
     public ReadResult readConfiguration(final SmallRyeConfig config) {

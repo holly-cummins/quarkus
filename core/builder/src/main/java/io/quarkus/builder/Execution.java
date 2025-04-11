@@ -81,6 +81,7 @@ final class Execution {
     }
 
     BuildResult run() throws BuildException {
+        System.out.println("HOLLY running build chain");
         final long start = System.nanoTime();
         metrics.buildStarted();
         runningThread = Thread.currentThread();
@@ -90,6 +91,7 @@ final class Execution {
         for (StepInfo startStep : startSteps) {
             executor.execute(getBuildContext(startStep)::run);
         }
+        System.out.println("HOLLY waiting for the wrap up");
         // wait for the wrap-up
         boolean intr = false;
         try {

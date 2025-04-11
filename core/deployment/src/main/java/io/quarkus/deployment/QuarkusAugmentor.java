@@ -160,7 +160,7 @@ public class QuarkusAugmentor {
             for (PathCollection i : additionalApplicationArchives) {
                 execBuilder.produce(new AdditionalApplicationArchiveBuildItem(i));
             }
-            System.out.println("HOLLY finished babout to execute");
+            System.out.println("HOLLY about to execute build result");
             BuildResult buildResult = execBuilder.execute();
             System.out.println("HOLLY finished build result");
             String message = "Quarkus augmentation completed in " + TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start)
