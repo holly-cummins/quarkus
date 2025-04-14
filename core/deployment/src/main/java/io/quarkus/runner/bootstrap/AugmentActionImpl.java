@@ -49,7 +49,6 @@ import io.quarkus.deployment.builditem.GeneratedResourceBuildItem;
 import io.quarkus.deployment.builditem.LiveReloadBuildItem;
 import io.quarkus.deployment.builditem.MainClassBuildItem;
 import io.quarkus.deployment.builditem.TransformedClassesBuildItem;
-import io.quarkus.deployment.cmd.RunCommandActionResultBuildItem;
 import io.quarkus.deployment.pkg.builditem.ArtifactResultBuildItem;
 import io.quarkus.deployment.pkg.builditem.BuildSystemTargetBuildItem;
 import io.quarkus.deployment.pkg.builditem.DeploymentResultBuildItem;
@@ -521,7 +520,7 @@ public class AugmentActionImpl implements AugmentAction {
                 }
             }
         },
-                RunCommandActionResultBuildItem.class.getName(), DevServicesLauncherConfigResultBuildItem.class.getName());
+                DevServicesLauncherConfigResultBuildItem.class.getName());
     }
 
     /**
