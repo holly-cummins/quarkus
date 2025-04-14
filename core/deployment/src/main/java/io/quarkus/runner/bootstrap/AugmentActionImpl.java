@@ -352,6 +352,7 @@ public class AugmentActionImpl implements AugmentAction {
         try (QuarkusClassLoader classLoader = curatedApplication.createDeploymentClassLoader()) {
             @SuppressWarnings("unchecked")
             BuildResult result = runAugment(true, Collections.emptySet(), null, classLoader, NON_NORMAL_MODE_OUTPUTS);
+            // TODO do we need this one?
             //  performPrestart();
 
             return new StartupActionImpl(curatedApplication, result, this);
@@ -504,6 +505,7 @@ public class AugmentActionImpl implements AugmentAction {
                 if (log.isInfoEnabled()) {
                     log.info("Executing \"" + String.join(" ", args) + "\"");
                 }
+                // TODO doing a process here cannot be a good idea
                 Path workingDirectory = (Path) cmd.get(1);
                 try {
                     ProcessBuilder builder = new ProcessBuilder()

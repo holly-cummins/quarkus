@@ -444,8 +444,16 @@ public final class BuildChainBuilder {
     }
 
     private boolean isDevService(StepInfo stepInfo) {
+        // TODO experiment
+        return false;
+
         // TODO too crude a check
-        return stepInfo.getProduces().stream().anyMatch(i -> i.getType().getName().contains("DevServicesResult"));
+        //   return isDevServicy(stepInfo.getProduces()); //|| isDevServicy(stepInfo.getConsumes());
+    }
+
+    private boolean isDevServicy(Set<ItemId> produces) {
+        return produces.stream()
+                .anyMatch(i -> i.getType().getName().contains("DevServicesResult"));
     }
 
     void addProvider(final BuildProvider provider) throws ChainBuildException {
