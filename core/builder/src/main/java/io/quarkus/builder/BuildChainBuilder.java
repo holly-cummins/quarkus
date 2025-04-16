@@ -427,15 +427,33 @@ public final class BuildChainBuilder {
         }
         final StepInfo stepInfo = new StepInfo(toBuild, includedDependencies, dependentStepInfos);
         mapped.put(toBuild, stepInfo);
-        if (includedDependencies == 0) {
-            // it's a start step!
-            startSteps.add(stepInfo);
-        }
-        if (includedDependents == 0) {
-            // it's an end step!
-            endSteps.add(stepInfo);
+
+        if (!isDevService(stepInfo)) {
+            if (includedDependencies == 0) {
+                // it's a start step!
+                startSteps.add(stepInfo);
+            }
+            if (includedDependents == 0) {
+                // it's an end step!
+                endSteps.add(stepInfo);
+            }
+        } else {
+            System.out.println("HOLLY ding ding! stripping out " + stepInfo.getProduces());
         }
         return stepInfo;
+    }
+
+    private boolean isDevService(StepInfo stepInfo) {
+        // TODO experiment
+        return false;
+
+        // TODO too crude a check
+        //   return isDevServicy(stepInfo.getProduces()); //|| isDevServicy(stepInfo.getConsumes());
+    }
+
+    private boolean isDevServicy(Set<ItemId> produces) {
+        return produces.stream()
+                .anyMatch(i -> i.getType().getName().contains("DevServicesResult"));
     }
 
     void addProvider(final BuildProvider provider) throws ChainBuildException {

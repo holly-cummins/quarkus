@@ -227,6 +227,8 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
             populateCallbacks(startupAction.getClassLoader());
             populateTestMethodInvokers(startupAction.getClassLoader());
 
+            startupAction.getAugmentAction().performPrestart();
+
             if (profileInstance == null || !profileInstance.runMainMethod()) {
                 runningQuarkusApplication = startupAction
                         .run(profileInstance == null ? new String[0] : profileInstance.commandLineParameters());
@@ -616,6 +618,24 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
             currentJUnitTestClass = extensionContext.getRequiredTestClass();
         }
         boolean isNewApplication = isNewApplication(state, extensionContext.getRequiredTestClass());
+
+        // TODO hackk
+        QuarkusClassLoader cl = getClassLoaderFromTestClass(extensionContext.getRequiredTestClass());
+
+        CuratedApplication curatedApplication = runningQuarkusApplication != null
+                ? ((QuarkusClassLoader) runningQuarkusApplication.getClassLoader())
+                        .getCuratedApplication()
+                : null;
+        boolean isSameCuratedApplication = cl
+                .getCuratedApplication() == curatedApplication;
+        System.out.println("HOLLY compared " + cl.getCuratedApplication() + " and " + curatedApplication);
+        System.out.println("HOLLYcurrent test " + currentJUnitTestClass);
+
+        System.out.println(
+                "HOLLY " + extensionContext.getRequiredTestClass() + " is same Curated app" + isSameCuratedApplication);
+        System.out.println("HOLLY " + extensionContext.getRequiredTestClass() + " is new app" + isNewApplication);
+        cl.getCuratedApplication().setEligibleForReuse(isSameCuratedApplication);
+
         // TODO if classes are misordered, say because someone overrode the ordering, and there are profiles or resources,
         // we could try to start and application which has already been started, and fail with a mysterious error about
         // null shutdown contexts; we should try and detect that case, and give a friendlier error message
@@ -756,6 +776,7 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
         }
 
         // don't create outer test instances as they are created by the actual test to be run
+        // TODO can we drop this check?
         boolean isOuterClassOfNestedTest = false;
         if (currentTestClassStack.size() > 1
                 && currentTestClassStack.contains(requiredTestClass)

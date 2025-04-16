@@ -81,6 +81,7 @@ final class Execution {
     }
 
     BuildResult run() throws BuildException {
+        System.out.println("HOLLY running build chain");
         final long start = System.nanoTime();
         metrics.buildStarted();
         runningThread = Thread.currentThread();

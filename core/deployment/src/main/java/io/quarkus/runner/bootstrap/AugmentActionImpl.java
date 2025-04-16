@@ -16,9 +16,11 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import org.jboss.logging.Logger;
@@ -40,6 +42,7 @@ import io.quarkus.builder.BuildResult;
 import io.quarkus.builder.item.BuildItem;
 import io.quarkus.deployment.QuarkusAugmentor;
 import io.quarkus.deployment.builditem.ApplicationClassNameBuildItem;
+import io.quarkus.deployment.builditem.DevServicesLauncherConfigResultBuildItem;
 import io.quarkus.deployment.builditem.GeneratedClassBuildItem;
 import io.quarkus.deployment.builditem.GeneratedFileSystemResourceHandledBuildItem;
 import io.quarkus.deployment.builditem.GeneratedResourceBuildItem;
@@ -77,7 +80,6 @@ public class AugmentActionImpl implements AugmentAction {
     /**
      * A map that is shared between all re-runs of the same augment instance. This is
      * only really relevant in dev mode, however it is present in all modes for consistency.
-     *
      */
     private final Map<Class<?>, Object> reloadContext = new ConcurrentHashMap<>();
 
@@ -103,6 +105,7 @@ public class AugmentActionImpl implements AugmentAction {
         this.classLoadListeners = classLoadListeners;
         LaunchMode launchMode;
         DevModeType devModeType;
+        System.out.println("HOLLY augment I AM " + this.getClass().getClassLoader() + " " + quarkusBootstrap.getMode());
         switch (quarkusBootstrap.getMode()) {
             case DEV:
                 launchMode = LaunchMode.DEVELOPMENT;
@@ -139,10 +142,26 @@ public class AugmentActionImpl implements AugmentAction {
         this.devModeType = devModeType;
     }
 
+    private boolean isDevServiceBuildItem(String s) {
+        System.out.println("HOLLY checking " + s);
+        // TODO too crude a check
+        return s.contains("DevService");
+    }
+
     @Override
     public void performCustomBuild(String resultHandler, Object context, String... finalOutputs) {
+        performCustomBuild(resultHandler, context, false, finalOutputs);
+    }
+
+    // TODO should we always call the filter and always do the second phase?
+
+    public void performCustomBuild(String resultHandler, Object context, boolean skipDevServices, String... finalOutputs) {
+        Predicate<String> filter = skipDevServices ? s -> !isDevServiceBuildItem(s) : s -> true;
+
+        System.out.println("HOLLY PERFORMING custom build");
         try (QuarkusClassLoader classLoader = curatedApplication.createDeploymentClassLoader()) {
             Class<? extends BuildItem>[] targets = Arrays.stream(finalOutputs)
+                    .filter(filter)
                     .map(new Function<String, Class<? extends BuildItem>>() {
                         @Override
                         public Class<? extends BuildItem> apply(String s) {
@@ -152,14 +171,50 @@ public class AugmentActionImpl implements AugmentAction {
                                 throw new RuntimeException(e);
                             }
                         }
-                    }).toArray(Class[]::new);
+                    })
+                    .toArray(Class[]::new);
+            BuildResult result = runAugment(true, Collections.emptySet(), null, classLoader, targets);
+
+            writeDebugSourceFile(result);
+            // TODO consolidate common code
+            try {
+                BiConsumer<Object, BuildResult> consumer = (BiConsumer<Object, BuildResult>) Class
+                        .forName(resultHandler, false, classLoader)
+                        .getConstructor()
+                        .newInstance();
+                consumer.accept(context, result);
+            } catch (InstantiationException | IllegalAccessException | NoSuchMethodException | ClassNotFoundException
+                    | InvocationTargetException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
+    // TODO there's no evidence that this is ever called, even reflectively
+    // TODO and as it's a new method added in this PR, it should be removed :)
+    public void performPostBuild(String resultHandler, Object context, String... finalOutputs) {
+        try (QuarkusClassLoader classLoader = curatedApplication.createDeploymentClassLoader()) {
+            Class<? extends BuildItem>[] targets = Arrays.stream(finalOutputs)
+                    .filter(this::isDevServiceBuildItem)
+                    .map(new Function<String, Class<? extends BuildItem>>() {
+                        @Override
+                        public Class<? extends BuildItem> apply(String s) {
+                            try {
+                                return (Class<? extends BuildItem>) Class.forName(s, false, classLoader);
+                            } catch (ClassNotFoundException e) {
+                                throw new RuntimeException(e);
+                            }
+                        }
+                    })
+                    .toArray(Class[]::new);
             BuildResult result = runAugment(true, Collections.emptySet(), null, classLoader, targets);
 
             writeDebugSourceFile(result);
             try {
                 BiConsumer<Object, BuildResult> consumer = (BiConsumer<Object, BuildResult>) Class
                         .forName(resultHandler, false, classLoader)
-                        .getConstructor().newInstance();
+                        .getConstructor()
+                        .newInstance();
                 consumer.accept(context, result);
             } catch (InstantiationException | IllegalAccessException | NoSuchMethodException | ClassNotFoundException
                     | InvocationTargetException e) {
@@ -170,6 +225,7 @@ public class AugmentActionImpl implements AugmentAction {
 
     @Override
     public AugmentResult createProductionApplication() {
+        System.out.println("HOLLY creating production application");
         if (launchMode != LaunchMode.NORMAL) {
             throw new IllegalStateException("Can only create a production application when using NORMAL launch mode");
         }
@@ -198,7 +254,8 @@ public class AugmentActionImpl implements AugmentAction {
                     jarBuildItem != null ? jarBuildItem.toJarResult(sboms.getOrDefault(jarBuildItem.getPath(), List.of()))
                             : null,
                     nativeImageBuildItem != null ? nativeImageBuildItem.getPath() : null,
-                    nativeImageBuildItem != null ? nativeImageBuildItem.getGraalVMInfo().toMap() : Map.of());
+                    nativeImageBuildItem != null ? nativeImageBuildItem.getGraalVMInfo()
+                            .toMap() : Map.of());
         }
     }
 
@@ -208,7 +265,8 @@ public class AugmentActionImpl implements AugmentAction {
         }
         final Map<Path, List<SbomResult>> result = new HashMap<>();
         for (var sbomBuildItem : sbomBuildItems) {
-            result.computeIfAbsent(sbomBuildItem.getResult().getApplicationRunner(), p -> new ArrayList<>())
+            result.computeIfAbsent(sbomBuildItem.getResult()
+                    .getApplicationRunner(), p -> new ArrayList<>())
                     .add(sbomBuildItem.getResult());
         }
         return result;
@@ -225,8 +283,10 @@ public class AugmentActionImpl implements AugmentAction {
                             debugPath.mkdir();
                         }
                         File sourceFile = new File(debugPath, i.getName() + ".zig");
-                        sourceFile.getParentFile().mkdirs();
-                        Files.write(sourceFile.toPath(), i.getSource().getBytes(StandardCharsets.UTF_8),
+                        sourceFile.getParentFile()
+                                .mkdirs();
+                        Files.write(sourceFile.toPath(), i.getSource()
+                                .getBytes(StandardCharsets.UTF_8),
                                 StandardOpenOption.CREATE);
                         log.infof("Wrote source: %s", sourceFile.getAbsolutePath());
                     } else {
@@ -242,13 +302,15 @@ public class AugmentActionImpl implements AugmentAction {
     private void writeArtifactResultMetadataFile(BuildSystemTargetBuildItem outputTargetBuildItem,
             List<ArtifactResultBuildItem> artifactResultBuildItems) {
         ArtifactResultBuildItem lastArtifact = artifactResultBuildItems.get(artifactResultBuildItems.size() - 1);
-        Path quarkusArtifactMetadataPath = outputTargetBuildItem.getOutputDirectory().resolve("quarkus-artifact.properties");
+        Path quarkusArtifactMetadataPath = outputTargetBuildItem.getOutputDirectory()
+                .resolve("quarkus-artifact.properties");
         Properties properties = new Properties();
         properties.put("type", lastArtifact.getType());
         if (lastArtifact.getPath() != null) {
             properties.put("path", artifactPathForResultMetadata(outputTargetBuildItem, lastArtifact));
         } else {
-            if (lastArtifact.getType().endsWith("-container")) {
+            if (lastArtifact.getType()
+                    .endsWith("-container")) {
                 // in this case we write "path" as to contain the path to the artifact from which the container was built
                 try {
                     ArtifactResultBuildItem baseArtifact = artifactResultBuildItems.get(artifactResultBuildItems.size() - 2);
@@ -276,7 +338,9 @@ public class AugmentActionImpl implements AugmentAction {
 
     private static String artifactPathForResultMetadata(BuildSystemTargetBuildItem outputTargetBuildItem,
             ArtifactResultBuildItem artifactResultBuildItem) {
-        return outputTargetBuildItem.getOutputDirectory().relativize(artifactResultBuildItem.getPath()).toString();
+        return outputTargetBuildItem.getOutputDirectory()
+                .relativize(artifactResultBuildItem.getPath())
+                .toString();
     }
 
     @Override
@@ -287,7 +351,10 @@ public class AugmentActionImpl implements AugmentAction {
         try (QuarkusClassLoader classLoader = curatedApplication.createDeploymentClassLoader()) {
             @SuppressWarnings("unchecked")
             BuildResult result = runAugment(true, Collections.emptySet(), null, classLoader, NON_NORMAL_MODE_OUTPUTS);
-            return new StartupActionImpl(curatedApplication, result);
+            // TODO do we need this one?
+            //  performPrestart();
+
+            return new StartupActionImpl(curatedApplication, result, this);
         }
     }
 
@@ -303,17 +370,29 @@ public class AugmentActionImpl implements AugmentAction {
             BuildResult result = runAugment(!hasStartedSuccessfully, changedResources, classChangeInformation, classLoader,
                     NON_NORMAL_MODE_OUTPUTS);
 
-            return new StartupActionImpl(curatedApplication, result);
+            // TODO can we get a new augmenty thing from the result? This path is only in isolated dev mode maine
+            return new StartupActionImpl(curatedApplication, result, this);
         }
     }
 
     private BuildResult runAugment(boolean firstRun, Set<String> changedResources,
             ClassChangeInformation classChangeInformation, ClassLoader deploymentClassLoader,
             Class<? extends BuildItem>... finalOutputs) {
-        ClassLoader old = Thread.currentThread().getContextClassLoader();
+        System.out.println("HOLLY running augment " + Arrays.toString(finalOutputs));
+        System.out.println("HOLLY running augment TCCL " + Thread.currentThread().getContextClassLoader());
+        System.out.println("HOLLY running augment I AM " + this.getClass().getClassLoader());
+
+        // TODO should the filter be here, or in performCustomBuild?
+
+        //        Arrays.stream(finalOutputs)
+        //                .filter(s -> !isDevServiceBuildItem(s.getName()));
+
+        ClassLoader old = Thread.currentThread()
+                .getContextClassLoader();
         try {
             QuarkusClassLoader classLoader = curatedApplication.getOrCreateAugmentClassLoader();
-            Thread.currentThread().setContextClassLoader(classLoader);
+            Thread.currentThread()
+                    .setContextClassLoader(classLoader);
             LaunchMode.set(launchMode);
 
             QuarkusAugmentor.Builder builder = QuarkusAugmentor.builder()
@@ -332,14 +411,17 @@ public class AugmentActionImpl implements AugmentAction {
                 builder.setOriginalBaseName(quarkusBootstrap.getOriginalBaseName());
             }
 
-            boolean auxiliaryApplication = curatedApplication.getQuarkusBootstrap().isAuxiliaryApplication();
+            boolean auxiliaryApplication = curatedApplication.getQuarkusBootstrap()
+                    .isAuxiliaryApplication();
             builder.setAuxiliaryApplication(auxiliaryApplication);
             builder.setAuxiliaryDevModeType(
-                    curatedApplication.getQuarkusBootstrap().isHostApplicationIsTestOnly() ? DevModeType.TEST_ONLY
-                            : (auxiliaryApplication ? DevModeType.LOCAL : null));
+                    curatedApplication.getQuarkusBootstrap()
+                            .isHostApplicationIsTestOnly() ? DevModeType.TEST_ONLY
+                                    : (auxiliaryApplication ? DevModeType.LOCAL : null));
             builder.setLaunchMode(launchMode);
             builder.setDevModeType(devModeType);
-            builder.setTest(curatedApplication.getQuarkusBootstrap().isTest());
+            builder.setTest(curatedApplication.getQuarkusBootstrap()
+                    .isTest());
             builder.setRebuild(quarkusBootstrap.isRebuild());
             if (firstRun) {
                 builder.setLiveReloadState(
@@ -365,16 +447,80 @@ public class AugmentActionImpl implements AugmentAction {
             }
 
             try {
-                return builder.build().run();
+                System.out.println("HOLLY at the critical moment TCCL is " + Thread.currentThread().getContextClassLoader());
+                System.out.println("HOLLY at the critical moment I AM is " + this.getClass().getClassLoader());
+                BuildResult bla = builder.build()
+                        .run();
+                return bla;
             } catch (RuntimeException e) {
                 throw e;
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
         } finally {
-            Thread.currentThread().setContextClassLoader(old);
+            Thread.currentThread()
+                    .setContextClassLoader(old);
             //QuarkusConfigFactory.setConfig(null);
         }
+    }
+
+    public void performPrestart() {
+        AugmentAction action = this;
+        String target = "jar"; // TODO WHAT SHOULD THIS BE?
+        AtomicReference<Boolean> exists = new AtomicReference<>();
+        AtomicReference<String> tooMany = new AtomicReference<>();
+        // TODO what class do we pass in? what does accept do?
+        action.performCustomBuild(HackHandler.class.getName(), new Consumer<Map<String, List>>() {
+            @Override
+            public void accept(Map<String, List> cmds) {
+                List cmd = null;
+                if (target != null) {
+                    cmd = cmds.get(target);
+                    if (cmd == null) {
+                        exists.set(false);
+                        return;
+                    }
+                } else if (cmds.size() == 1) { // defaults to pure java run
+                    cmd = cmds.values()
+                            .iterator()
+                            .next();
+                } else if (cmds.size() == 2) { // choose not default
+                    for (Map.Entry<String, List> entry : cmds.entrySet()) {
+                        if (entry.getKey()
+                                .equals("java"))
+                            continue;
+                        cmd = entry.getValue();
+                        break;
+                    }
+                } else if (cmds.size() > 2) {
+                    tooMany.set(cmds.keySet()
+                            .stream()
+                            .collect(Collectors.joining(" ")));
+                    return;
+                } else {
+                    throw new RuntimeException("Should never reach this!");
+                }
+                List<String> args = (List<String>) cmd.get(0);
+                if (log.isInfoEnabled()) {
+                    log.info("Executing \"" + String.join(" ", args) + "\"");
+                }
+                // TODO doing a process here cannot be a good idea
+                Path workingDirectory = (Path) cmd.get(1);
+                try {
+                    ProcessBuilder builder = new ProcessBuilder()
+                            .command(args)
+                            .inheritIO();
+                    if (workingDirectory != null) {
+                        builder.directory(workingDirectory.toFile());
+                    }
+                    Process process = builder.start();
+                    int exit = process.waitFor();
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        },
+                DevServicesLauncherConfigResultBuildItem.class.getName());
     }
 
     /**

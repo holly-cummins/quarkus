@@ -15,6 +15,8 @@ public interface AugmentAction {
      */
     void performCustomBuild(String resultConsumer, Object context, String... finalOutputs);
 
+    void performPrestart();
+
     AugmentResult createProductionApplication();
 
     StartupAction createInitialRuntimeApplication();

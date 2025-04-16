@@ -24,6 +24,7 @@ import java.util.function.Consumer;
 import org.jboss.logging.Logger;
 
 import io.quarkus.bootstrap.BootstrapDebug;
+import io.quarkus.bootstrap.app.AugmentAction;
 import io.quarkus.bootstrap.app.CuratedApplication;
 import io.quarkus.bootstrap.app.QuarkusBootstrap;
 import io.quarkus.bootstrap.app.RunningQuarkusApplication;
@@ -57,9 +58,11 @@ public class StartupActionImpl implements StartupAction {
     private final String devServicesNetworkId;
     private final List<RuntimeApplicationShutdownBuildItem> runtimeApplicationShutdownBuildItems;
     private final List<Closeable> runtimeCloseTasks = new ArrayList<>();
+    private final AugmentAction augmentAction;
 
-    public StartupActionImpl(CuratedApplication curatedApplication, BuildResult buildResult) {
+    public StartupActionImpl(CuratedApplication curatedApplication, BuildResult buildResult, AugmentAction augmentAction) {
         this.curatedApplication = curatedApplication;
+        this.augmentAction = augmentAction;
 
         this.mainClassName = buildResult.consume(MainClassBuildItem.class).getClassName();
         this.applicationClassName = buildResult.consume(ApplicationClassNameBuildItem.class).getClassName();
@@ -186,6 +189,11 @@ public class StartupActionImpl implements StartupAction {
     @Override
     public void addRuntimeCloseTask(Closeable closeTask) {
         this.runtimeCloseTasks.add(closeTask);
+    }
+
+    @Override
+    public AugmentAction getAugmentAction() {
+        return augmentAction;
     }
 
     private void doClose() {
@@ -340,11 +348,15 @@ public class StartupActionImpl implements StartupAction {
                                 log.error("Failed to run close task", t);
                             }
                         }
-                        if (curatedApplication.getQuarkusBootstrap().getMode() == QuarkusBootstrap.Mode.TEST &&
-                                !curatedApplication.getQuarkusBootstrap().isAuxiliaryApplication()) {
-                            //for tests, we just always shut down the curated application, as it is only used once
-                            //dev mode might be about to restart, so we leave it
-                            curatedApplication.close();
+                        // This will read the state of the curated application at the time of closing;
+                        // If the caller of close knows that the 'next' application shares a curated application, it can set eligible for reuse to true
+                        if (!curatedApplication.isEligibleForReuse()) {
+                            if (curatedApplication.getQuarkusBootstrap().getMode() == QuarkusBootstrap.Mode.TEST
+                                    && !curatedApplication.getQuarkusBootstrap().isAuxiliaryApplication()) {
+                                //for tests, we just always shut down the curated application, as it is only used once
+                                //dev mode might be about to restart, so we leave it
+                                curatedApplication.close();
+                            }
                         }
                     }
                 }
