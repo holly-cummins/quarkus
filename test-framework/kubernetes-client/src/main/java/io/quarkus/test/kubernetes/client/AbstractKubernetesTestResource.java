@@ -15,6 +15,7 @@ public abstract class AbstractKubernetesTestResource<T, C extends KubernetesClie
     @Override
     public Map<String, String> start() {
         final Map<String, String> systemProps = new HashMap<>();
+        // TODO is there a better way of doing this?
         systemProps.put(Config.KUBERNETES_TRUST_CERT_SYSTEM_PROPERTY, "true");
         systemProps.put("quarkus.tls.trust-all", "true");
         systemProps.put(Config.KUBERNETES_AUTH_TRYKUBECONFIG_SYSTEM_PROPERTY, "false");
