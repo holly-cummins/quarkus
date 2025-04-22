@@ -54,7 +54,7 @@ public class TestConfigProviderResolver extends SmallRyeConfigProviderResolver {
             SmallRyeConfig config = configs.computeIfAbsent(mode, new Function<LaunchMode, SmallRyeConfig>() {
                 @Override
                 public SmallRyeConfig apply(final LaunchMode launchMode) {
-                    System.out.println((("HOLLY wull build, iam " + this.getClass()
+                    System.out.println((("HOLLY wull apply config, iam " + this.getClass()
                             .getClassLoader() + " tccl"
                             + Thread.currentThread()
                                     .getContextClassLoader()

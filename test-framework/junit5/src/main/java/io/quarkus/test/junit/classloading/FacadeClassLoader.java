@@ -230,6 +230,7 @@ public final class FacadeClassLoader extends ClassLoader implements Closeable {
     @Override
     public Class<?> loadClass(String name) throws ClassNotFoundException {
         Log.debugf("Facade classloader loading %s", name);
+        System.out.println("HOLLY loading " + name);
 
         if (peekingClassLoader == null) {
             throw new RuntimeException("Attempted to load classes with a closed classloader: " + this);

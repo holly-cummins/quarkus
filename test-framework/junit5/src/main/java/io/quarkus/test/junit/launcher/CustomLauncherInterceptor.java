@@ -40,7 +40,7 @@ public class CustomLauncherInterceptor implements LauncherDiscoveryListener, Lau
         // some for creation of Launcher instances, and some for calls to Launcher.discover(LauncherDiscoveryRequest), Launcher.execute(TestPlan, TestExecutionListener...), and Launcher.execute(LauncherDiscoveryRequest, TestExecutionListener...)
         // We only know why it was called *after* calling invocation.proceed, sadly
         // The Gradle classloading seems to happen immediately after the ConfigSessionListener is triggered, but before the next launch invocation
-        //adjustContextClassLoader();
+        adjustContextClassLoader();
         //    }
 
         return answer;
@@ -65,6 +65,7 @@ public class CustomLauncherInterceptor implements LauncherDiscoveryListener, Lau
 
     @Override
     public void launcherDiscoveryStarted(LauncherDiscoveryRequest request) {
+        System.out.println("HOLLY WAHOO discpvery started TCCL check" + Thread.currentThread().getContextClassLoader());
         // Do not do any classloading dance for prod mode tests;
         // We're too early for config to be available, so just check the system props
         if (!isProductionModeTests()) {
@@ -74,6 +75,7 @@ public class CustomLauncherInterceptor implements LauncherDiscoveryListener, Lau
     }
 
     private void adjustContextClassLoader() {
+        System.out.println("HOLLY adjust TCCL CHECK" + Thread.currentThread().getContextClassLoader());
         ClassLoader currentCl = Thread.currentThread().getContextClassLoader();
         // Be aware, this method might be called more than once, for different kinds of invocations; especially for Gradle executions, the executions could happen before the TCCL gets constructed and set by JUnitTestRunner
         // We might not be in the same classloader as the Facade ClassLoader, so use a name comparison instead of an instanceof
