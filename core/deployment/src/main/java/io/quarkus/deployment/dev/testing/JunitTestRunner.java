@@ -209,6 +209,7 @@ public class JunitTestRunner {
                 launchBuilder.filters(new CurrentlyFailingFilter());
             }
 
+            Thread.currentThread().setContextClassLoader(ClassLoader.getSystemClassLoader());
             LauncherDiscoveryRequest request = launchBuilder
                     .build();
             System.out.println("HOLLY TCCL watch 2a " + Thread.currentThread().getContextClassLoader());
