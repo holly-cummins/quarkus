@@ -42,11 +42,27 @@ public class ClassCoercingTestProfile implements QuarkusTestProfile {
 
     @Override
     public Map<String, String> getConfigOverrides() {
+        Map<String, String> configOverrides;
         if (profile != null) {
-            return profile.getConfigOverrides();
+            configOverrides = profile.getConfigOverrides();
         } else {
-            return (Map<String, String>) invokeReflectively("getConfigOverrides");
+            configOverrides = (Map<String, String>) invokeReflectively("getConfigOverrides");
         }
+        for (String key : configOverrides.keySet()) {
+            if (configOverrides.get(key) == null) {
+                Map<String, String> env = System.getenv();
+                for (String envName : env.keySet()) {
+                    System.out.format("ENVIRONMENT %s=%s%n", envName, env.get(envName));
+                }
+                throw new IllegalArgumentException(
+                        "In class coercing profile, property key " + key + " is null. The profile is " + profile
+                                + " and the uncast profile instance is "
+                                + uncast);
+
+            }
+        }
+        return configOverrides;
+
     }
 
     @Override

@@ -99,7 +99,20 @@ public class AppMakerHelper {
                     .newInstance());
             // TODO we make this twice, also in abstractjvmextension can we streamline that?
             // TODO We can't get rid of the one here because config needs to be set before augmentation, but maybe we can get rid of it on the test side?
-            additional.putAll(profileInstance.getConfigOverrides());
+
+            Map<String, String> configOverrides = profileInstance.getConfigOverrides();
+            for (String key : configOverrides.keySet()) {
+                if (configOverrides.get(key) == null) {
+                    Map<String, String> env = System.getenv();
+                    for (String envName : env.keySet()) {
+                        System.out.format("ENVIRONMENT %s=%s%n", envName, env.get(envName));
+                    }
+                    throw new IllegalArgumentException(
+                            "Property key " + key + " is null. The profile instance is " + profileInstance);
+
+                }
+            }
+            additional.putAll(configOverrides);
             if (!profileInstance.getEnabledAlternatives()
                     .isEmpty()) {
                 additional.put("quarkus.arc.selected-alternatives", profileInstance.getEnabledAlternatives()
