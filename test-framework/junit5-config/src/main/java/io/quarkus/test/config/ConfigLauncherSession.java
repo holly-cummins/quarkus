@@ -27,6 +27,7 @@ public class ConfigLauncherSession implements LauncherSessionListener {
             Thread.currentThread()
                     .setContextClassLoader(ClassLoader.getSystemClassLoader());
         }
+        Thread.currentThread().setContextClassLoader(this.getClass().getClassLoader());
         System.out.println("HOLLY creating config launcher, second TCCL is " + Thread.currentThread().getContextClassLoader());
         try {
             TestConfigProviderResolver resolver = new TestConfigProviderResolver();

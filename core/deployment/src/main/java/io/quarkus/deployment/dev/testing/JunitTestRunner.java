@@ -209,7 +209,7 @@ public class JunitTestRunner {
                 launchBuilder.filters(new CurrentlyFailingFilter());
             }
 
-            Thread.currentThread().setContextClassLoader(ClassLoader.getSystemClassLoader());
+            //            Thread.currentThread().setContextClassLoader(ClassLoader.getSystemClassLoader());
             LauncherDiscoveryRequest request = launchBuilder
                     .build();
             System.out.println("HOLLY TCCL watch 2a " + Thread.currentThread().getContextClassLoader());
@@ -255,6 +255,7 @@ public class JunitTestRunner {
                         AtomicReference<TestIdentifier> currentNonDynamicTest = new AtomicReference<>();
 
                         Thread.currentThread().setContextClassLoader(tcl);
+                        System.out.println("HOLLY setting TCCL to " + tcl);
                         launcher.execute(testPlan, new TestExecutionListener() {
 
                             @Override

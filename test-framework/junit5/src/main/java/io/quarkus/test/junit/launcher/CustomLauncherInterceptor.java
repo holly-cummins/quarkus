@@ -4,12 +4,12 @@ import java.io.IOException;
 
 import org.junit.platform.launcher.LauncherDiscoveryListener;
 import org.junit.platform.launcher.LauncherDiscoveryRequest;
+import org.junit.platform.launcher.LauncherInterceptor;
 import org.junit.platform.launcher.LauncherSession;
-import org.junit.platform.launcher.LauncherSessionListener;
 
 import io.quarkus.test.junit.classloading.FacadeClassLoader;
 
-public class CustomLauncherInterceptor implements LauncherDiscoveryListener, LauncherSessionListener {
+public class CustomLauncherInterceptor implements LauncherDiscoveryListener, LauncherInterceptor {
 
     private static FacadeClassLoader facadeLoader = null;
     // This class might be instantiated several times over the course of an execution, so use a static variable to store a 'true' starting state
@@ -23,6 +23,18 @@ public class CustomLauncherInterceptor implements LauncherDiscoveryListener, Lau
     }
 
     @Override
+    public <T> T intercept(Invocation<T> invocation) {
+        // Do not do any classloading dance for prod mode tests;
+        if (isProductionModeTests()) {
+            return invocation.proceed();
+
+        } else {
+            return actuallyIntercept(invocation);
+        }
+
+    }
+
+    //    @Override
     public void launcherSessionOpened(LauncherSession session) {
         // Do not do any classloading dance for prod mode tests;
         if (!isProductionModeTests()) {
@@ -60,6 +72,26 @@ public class CustomLauncherInterceptor implements LauncherDiscoveryListener, Lau
 
     }
 
+    private <T> T actuallyIntercept(Invocation<T> invocation) {
+        ClassLoader currentCl = Thread.currentThread().getContextClassLoader();
+        // Be aware, this method might be called more than once, for different kinds of invocations; especially for Gradle executions, the executions could happen before the TCCL gets constructed and set by JUnitTestRunner
+        // We might not be in the same classloader as the Facade ClassLoader, so use a name comparison instead of an instanceof
+        if (true || currentCl == null
+                || (currentCl != facadeLoader && !currentCl.getClass().getName().equals(FacadeClassLoader.class.getName()))) {
+            //            this.origCl = currentCl;
+
+            initializeFacadeClassLoader();
+            adjustContextClassLoader();
+            return invocation.proceed();
+
+            // It's tempting to tidy up in a finally block by resetting the TCCL, but the gradle tests
+            // do discovery 'between' invocation blocks, and outside the main
+
+        } else {
+            return invocation.proceed();
+        }
+    }
+
     // Make a facade classloader if needed, so that we can close it at the end of the launcher session
     private void initializeFacadeClassLoader() {
         ClassLoader currentCl = Thread.currentThread().getContextClassLoader();
@@ -94,19 +126,21 @@ public class CustomLauncherInterceptor implements LauncherDiscoveryListener, Lau
         // We might not be in the same classloader as the Facade ClassLoader, so use a name comparison instead of an instanceof
         if (currentCl == null
                 || (currentCl != facadeLoader && !currentCl.getClass().getName().equals(FacadeClassLoader.class.getName()))) {
-            origCl = currentCl;
+            System.out.println("HOLLY NOT setting orig to " + currentCl);
+            //    origCl = currentCl;
             Thread.currentThread().setContextClassLoader(facadeLoader);
         }
     }
 
     @Override
     public void launcherDiscoveryFinished(LauncherDiscoveryRequest request) {
+        System.out.println("HOLLY discobery finished");
         // Do not close the facade loader at this stage, because discovery finished may be called several times within a single run
         // Ideally we would only clear TCCLs we set, but in practice we want to make sure the TCCL is correct post-discoverym even in continuous testing scenarios where the FCL gets created by the runner
         Thread.currentThread().setContextClassLoader(origCl);
     }
 
-    @Override
+    //    @Override
     public void launcherSessionClosed(LauncherSession session) {
 
         System.out.println("HOLLY session closed TCCL check" + Thread.currentThread().getContextClassLoader());
@@ -118,6 +152,30 @@ public class CustomLauncherInterceptor implements LauncherDiscoveryListener, Lau
                 facadeLoader = null;
             }
         } catch (IOException e) {
+            throw new RuntimeException("Failed to close custom classloader", e);
+        }
+    }
+
+    @Override
+    public void close() {
+
+        try {
+            // Tidy up classloaders we created, but not ones created upstream
+            // Also make sure to reset the TCCL so we don't leave a closed classloader on the thread
+            if (facadeLoader != null) {
+
+                // Reset the TCCL if it's one we set, but not otherwise
+                if (Thread.currentThread().getContextClassLoader() == facadeLoader) {
+                    Thread.currentThread().setContextClassLoader(origCl);
+                }
+
+                facadeLoader.close();
+                facadeLoader = null;
+
+            }
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
             throw new RuntimeException("Failed to close custom classloader", e);
         }
     }
