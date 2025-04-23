@@ -54,6 +54,9 @@ public class ClassCoercingTestProfile implements QuarkusTestProfile {
                 for (String envName : env.keySet()) {
                     System.out.format("ENVIRONMENT %s=%s%n", envName, env.get(envName));
                 }
+                for (String key2 : configOverrides.keySet()) {
+                    System.out.format("MAP %s=%s%n", key, configOverrides.get(key2));
+                }
                 throw new IllegalArgumentException(
                         "In class coercing profile, property key " + key + " is null. The profile is " + profile
                                 + " and the uncast profile instance is "
