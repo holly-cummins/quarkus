@@ -28,6 +28,8 @@ public class CustomLauncherInterceptor implements LauncherDiscoveryListener, Lau
             initializeFacadeClassLoader();
         }
 
+        ClassLoader old = Thread.currentThread().getContextClassLoader();
+        Thread.currentThread().setContextClassLoader(facadeLoader);
         T answer = invocation.proceed();
 
         // Because of how gradle works, in the forked JVM, it loads the test classes *before* JUnit discovery is called.
@@ -40,8 +42,9 @@ public class CustomLauncherInterceptor implements LauncherDiscoveryListener, Lau
         // some for creation of Launcher instances, and some for calls to Launcher.discover(LauncherDiscoveryRequest), Launcher.execute(TestPlan, TestExecutionListener...), and Launcher.execute(LauncherDiscoveryRequest, TestExecutionListener...)
         // We only know why it was called *after* calling invocation.proceed, sadly
         // The Gradle classloading seems to happen immediately after the ConfigSessionListener is triggered, but before the next launch invocation
-        adjustContextClassLoader();
+        //        adjustContextClassLoader();
         //    }
+        Thread.currentThread().setContextClassLoader(old);
 
         return answer;
 
