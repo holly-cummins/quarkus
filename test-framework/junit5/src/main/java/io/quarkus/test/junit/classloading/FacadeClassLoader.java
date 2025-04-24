@@ -574,6 +574,10 @@ public final class FacadeClassLoader extends ClassLoader implements Closeable {
 
     }
 
+    public boolean isServiceLoaderMechanism() {
+        return isServiceLoaderMechanism;
+    }
+
     @Override
     public String getName() {
         return NAME;

@@ -188,6 +188,16 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
         try {
             final LinkedBlockingDeque<Runnable> shutdownTasks = new LinkedBlockingDeque<>();
 
+            System.out.println("HOLLY TCCL check i am " + this.getClass().getClassLoader() + " and TCCK "
+                    + Thread.currentThread().getContextClassLoader() + " and it is "
+                    + TestHttpEndpointProvider.class.getClassLoader());
+
+            Class<?> aClass = Thread.currentThread()
+                    .getContextClassLoader()
+                    .loadClass("io.quarkus.resteasy.server.common.runtime.RESTEasyTestHttpProvider");
+            System.out.println("HOLLY when we load it is is " + aClass.getClassLoader());
+            System.out.println("interface is " + aClass.getInterfaces()[0].getClassLoader());
+
             testHttpEndpointProviders = TestHttpEndpointProvider.load();
 
             // clear the test.url system property as the value leaks into the run when using different profiles

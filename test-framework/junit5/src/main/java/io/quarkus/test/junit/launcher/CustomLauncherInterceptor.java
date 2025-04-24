@@ -1,7 +1,5 @@
 package io.quarkus.test.junit.launcher;
 
-import java.io.IOException;
-
 import org.junit.platform.launcher.LauncherDiscoveryListener;
 import org.junit.platform.launcher.LauncherDiscoveryRequest;
 import org.junit.platform.launcher.LauncherInterceptor;
@@ -36,39 +34,41 @@ public class CustomLauncherInterceptor implements LauncherDiscoveryListener, Lau
 
     //    @Override
     public void launcherSessionOpened(LauncherSession session) {
+        System.out.println("HOLLY session opened TCCL check " + Thread.currentThread().getContextClassLoader());
+        System.out.println("HOLLY session opened session " + session.getLauncher());
         // Do not do any classloading dance for prod mode tests;
-        if (!isProductionModeTests()) {
-            System.out.println("HOLLY intercept " + session);
-            initializeFacadeClassLoader();
-
-            ClassLoader old = Thread.currentThread()
-                    .getContextClassLoader();
-            Thread.currentThread()
-                    .setContextClassLoader(facadeLoader);
-            //    T answer = invocation.proceed();
-
-            // Because of how gradle works, in the forked JVM, it loads the test classes *before* JUnit discovery is called.
-            // That means that setting the TCCL on discovery is too late, but setting the TCCL on the interception is earlier than we'd like,
-            // and causes some problems with config being set on the wrong classloader.
-
-            // It's unclear if it's better to special-case gradle to reduce the impact, or be generic to make things consistent
-            //   if (System.getProperty("org.gradle.test.worker") != null) {
-            // This gets called several times; some for creation of LauncherSessionListener instances registered via the ServiceLoader mechanism,
-            // some for creation of Launcher instances, and some for calls to Launcher.discover(LauncherDiscoveryRequest), Launcher.execute(TestPlan, TestExecutionListener...), and Launcher.execute(LauncherDiscoveryRequest, TestExecutionListener...)
-            // We only know why it was called *after* calling invocation.proceed, sadly
-            // The Gradle classloading seems to happen immediately after the LauncherSessionListener is triggered, but before the next launch invocation
-            //        adjustContextClassLoader();
-            //    }
-            //            Thread.currentThread()
-            //                    .setContextClassLoader(old);
-            System.out.println("HOLLY resetting to " + old);
-            //     System.out.println("HOLLY answr " + answer);
-
-            //      return answer;
-            //        } else {
-            //            return invocation.proceed();
-            //        }
-        }
+        //        if (!isProductionModeTests()) {
+        //            System.out.println("HOLLY intercept " + session);
+        //            initializeFacadeClassLoader();
+        //
+        //            ClassLoader old = Thread.currentThread()
+        //                    .getContextClassLoader();
+        //            Thread.currentThread()
+        //                    .setContextClassLoader(facadeLoader);
+        //            //    T answer = invocation.proceed();
+        //
+        //            // Because of how gradle works, in the forked JVM, it loads the test classes *before* JUnit discovery is called.
+        //            // That means that setting the TCCL on discovery is too late, but setting the TCCL on the interception is earlier than we'd like,
+        //            // and causes some problems with config being set on the wrong classloader.
+        //
+        //            // It's unclear if it's better to special-case gradle to reduce the impact, or be generic to make things consistent
+        //            //   if (System.getProperty("org.gradle.test.worker") != null) {
+        //            // This gets called several times; some for creation of LauncherSessionListener instances registered via the ServiceLoader mechanism,
+        //            // some for creation of Launcher instances, and some for calls to Launcher.discover(LauncherDiscoveryRequest), Launcher.execute(TestPlan, TestExecutionListener...), and Launcher.execute(LauncherDiscoveryRequest, TestExecutionListener...)
+        //            // We only know why it was called *after* calling invocation.proceed, sadly
+        //            // The Gradle classloading seems to happen immediately after the LauncherSessionListener is triggered, but before the next launch invocation
+        //            //        adjustContextClassLoader();
+        //            //    }
+        //            //            Thread.currentThread()
+        //            //                    .setContextClassLoader(old);
+        //            System.out.println("HOLLY resetting to " + old);
+        //            //     System.out.println("HOLLY answr " + answer);
+        //
+        //            //      return answer;
+        //            //        } else {
+        //            //            return invocation.proceed();
+        //            //        }
+        //        }
 
     }
 
@@ -135,25 +135,34 @@ public class CustomLauncherInterceptor implements LauncherDiscoveryListener, Lau
     @Override
     public void launcherDiscoveryFinished(LauncherDiscoveryRequest request) {
         System.out.println("HOLLY discobery finished");
-        // Do not close the facade loader at this stage, because discovery finished may be called several times within a single run
-        // Ideally we would only clear TCCLs we set, but in practice we want to make sure the TCCL is correct post-discoverym even in continuous testing scenarios where the FCL gets created by the runner
-        Thread.currentThread().setContextClassLoader(origCl);
+
+        // We need to support two somewhat incompatible scenarios.
+        // If there are user extensions present which implement `ExecutionCondition`, and they call config in `evaluateExecutionCondition`,
+        // they need the TCCL to be right for reading config (that is, the app classloader)
+        // On the other hand, if the QuarkusTestExtension is registered by a service loader mechanism, it gets loaded after the discovery phase finishes,
+        // so needs the TCCL to still be the facade classloader.
+        // This compromise does mean you can't use the service loader mechanism to avoid having to use `@QuarkusTest` and also use Quarkus config in your own test extensions, but that combination is very unlikely.
+        if (!facadeLoader.isServiceLoaderMechanism()) {
+            // Do not close the facade loader at this stage, because discovery finished may be called several times within a single run
+            // Ideally we would only clear TCCLs we set, but in practice we want to make sure the TCCL is correct post-discovery, even in continuous testing scenarios where the FCL gets created by the runner
+            Thread.currentThread().setContextClassLoader(origCl);
+        }
     }
 
     //    @Override
     public void launcherSessionClosed(LauncherSession session) {
 
         System.out.println("HOLLY session closed TCCL check" + Thread.currentThread().getContextClassLoader());
-        try {
-            // Tidy up classloaders we created, but not ones created upstream
-            // Also make sure to reset the TCCL so we don't leave a closed classloader on the thread
-            if (facadeLoader != null) {
-                facadeLoader.close();
-                facadeLoader = null;
-            }
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to close custom classloader", e);
-        }
+        //        try {
+        //            // Tidy up classloaders we created, but not ones created upstream
+        //            // Also make sure to reset the TCCL so we don't leave a closed classloader on the thread
+        //            if (facadeLoader != null) {
+        //                facadeLoader.close();
+        //                facadeLoader = null;
+        //            }
+        //        } catch (IOException e) {
+        //            throw new RuntimeException("Failed to close custom classloader", e);
+        //        }
     }
 
     @Override
