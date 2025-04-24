@@ -244,7 +244,10 @@ public final class FacadeClassLoader extends ClassLoader implements Closeable {
             try {
                 // We don't have enough information to make a runtime classloader yet, but we can make a curated application and a base classloader
                 QuarkusClassLoader runtimeClassLoader = getOrCreateBaseClassLoader(getProfileKey(null), null);
-                return runtimeClassLoader.loadClass(name);
+                Class clazz = runtimeClassLoader.loadClass(name);
+                // Now take us off the TCCL
+                Thread.currentThread().setContextClassLoader(ClassLoader.getSystemClassLoader());
+                return clazz;
             } catch (AppModelResolverException | BootstrapException | IOException e) {
                 throw new RuntimeException(e);
             }

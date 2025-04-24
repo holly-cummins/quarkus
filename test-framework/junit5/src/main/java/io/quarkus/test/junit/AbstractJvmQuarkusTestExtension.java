@@ -235,22 +235,6 @@ public class AbstractJvmQuarkusTestExtension extends AbstractQuarkusTestWithCont
             return ConditionEvaluationResult.enabled("Quarkus Test Profile tags only affect classes");
         }
 
-        // At this point, the TCCL is usually the FacadeClassLoader, but sometimes it's a deployment classloader (for multimodule tests), or the runtime classloader (for nested tests)
-        // Getting back to the FacadeClassLoader is non-trivial. We can't use the singleton on the class, because we will be accessing it from different classloaders.
-        // We can't have a hook back from the runtime classloader to the facade classloader, because
-        // when evaluating execution conditions for native tests, the test will have been loaded with the system classloader, not the runtime classloader.
-        // The one classloader we can reliably get to when evaluating test execution is the system classloader, so hook our config on that.
-
-        // To avoid instanceof check, check for the system classloader instead of checking for the quarkusclassloader
-        boolean isFlatClasspath = this.getClass().getClassLoader() == ClassLoader.getSystemClassLoader();
-
-        ClassLoader original = Thread.currentThread().getContextClassLoader();
-
-        // In native mode tests, a testconfig will not have been registered on the system classloader with a testconfig instance of our classloader, so in those cases, we do not want to set the TCCL
-        if (!isFlatClasspath) {
-            Thread.currentThread().setContextClassLoader(ClassLoader.getSystemClassLoader());
-        }
-
         TestConfig testConfig;
         try {
             testConfig = ConfigProvider.getConfig()
@@ -265,10 +249,6 @@ public class AbstractJvmQuarkusTestExtension extends AbstractQuarkusTestWithCont
             Log.debug("The class of the class we use for mapping is " + TestConfig.class.getClassLoader());
             throw new IllegalStateException("Non-viable test classloader, " + Thread.currentThread().getContextClassLoader()
                     + ". Is this a re-run of a failing test?");
-        } finally {
-            if (!isFlatClasspath) {
-                Thread.currentThread().setContextClassLoader(original);
-            }
         }
 
         Optional<List<String>> tags = testConfig.profile().tags();
