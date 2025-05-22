@@ -20,7 +20,7 @@
         <bouncycastle.fips.version>1.0.2.5</bouncycastle.fips.version>
         <bouncycastle.tls.fips.version>1.0.19</bouncycastle.tls.fips.version>
         <cyclonedx.version>9.0.5</cyclonedx.version>
-        <expressly.version>5.0.0</expressly.version>
+        <expressly.version>6.0.0</expressly.version>
         <findbugs.version>3.0.2</findbugs.version>
         <jandex.version>3.3.1</jandex.version>
         <javax.annotation-api.version>1.3.2</javax.annotation-api.version>
@@ -175,7 +175,7 @@
         <quarkus-spring-data-api.version>3.4</quarkus-spring-data-api.version>
         <quarkus-spring-security-api.version>6.4</quarkus-spring-security-api.version>
         <quarkus-spring-boot-api.version>3.4</quarkus-spring-boot-api.version>
-        <mockito.version>5.17.0</mockito.version>
+        <mockito.version>5.18.0</mockito.version>
         <jna.version>5.8.0</jna.version><!-- should satisfy both testcontainers and mongodb -->
         <quarkus-security.version>2.2.1</quarkus-security.version>
         <keycloak-client.version>26.0.5</keycloak-client.version>
@@ -398,6 +398,12 @@
                 <scope>import</scope>
                 <type>pom</type>
             </dependency>
+            <dependency>
+                <groupId>io.perfmark</groupId>
+                <artifactId>perfmark-api</artifactId>
+                <version>${perfmark.version}</version>
+            </dependency>
+
 
             <!-- Micrometer Core and Registries, imported as BOM -->
             <dependency>
@@ -847,6 +853,11 @@
             <dependency>
                 <groupId>io.quarkus</groupId>
                 <artifactId>quarkus-devservices-common</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.quarkus</groupId>
+                <artifactId>quarkus-devservices</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
