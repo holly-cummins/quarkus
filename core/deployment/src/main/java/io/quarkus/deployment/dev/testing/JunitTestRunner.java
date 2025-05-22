@@ -623,9 +623,14 @@ public class JunitTestRunner {
                     .asClass()
                     .name();
             quarkusTestClassesForFacadeClassLoader.add(name.toString());
+            System.out.println("HOLLY adding " + name);
             for (ClassInfo clazz : index.getAllKnownSubclasses(name)) {
+                System.out.println("HOLLY checking " + name);
+
                 if (!integrationTestClasses.contains(clazz.name()
                         .toString())) {
+                    System.out.println("HOLLY adding " + clazz.name());
+
                     quarkusTestClassesForFacadeClassLoader.add(clazz.name()
                             .toString());
                 }
