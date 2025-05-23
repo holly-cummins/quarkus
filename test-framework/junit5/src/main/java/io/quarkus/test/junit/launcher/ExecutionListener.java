@@ -1,8 +1,7 @@
 package io.quarkus.test.junit.launcher;
 
-import java.util.ArrayDeque;
-import java.util.Deque;
 import java.util.Optional;
+import java.util.Stack;
 import java.util.function.Consumer;
 
 import org.junit.platform.engine.TestExecutionResult;
@@ -20,7 +19,7 @@ import io.quarkus.bootstrap.classloading.QuarkusClassLoader;
  */
 public class ExecutionListener implements TestExecutionListener {
 
-    private final Deque<ClassLoader> origCl = new ArrayDeque<>();
+    private final Stack<ClassLoader> origCl = new Stack<>();
 
     @Override
     public void executionStarted(TestIdentifier testIdentifier) {
