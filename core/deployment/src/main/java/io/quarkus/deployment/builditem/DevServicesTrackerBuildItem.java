@@ -16,14 +16,16 @@ public final class DevServicesTrackerBuildItem extends SimpleBuildItem {
     // This is a fairly thin wrapper around the tracker, so the tracker can be loaded with the system classloader
     // The QuarkusClassLoader takes care of loading the tracker with the right classloader
     private final RunningDevServicesTracker tracker;
+    private final String uuid;
 
-    public DevServicesTrackerBuildItem() {
+    public DevServicesTrackerBuildItem(String uuid) {
         tracker = new RunningDevServicesTracker();
+        this.uuid = uuid;
     }
 
     public Set<Closeable> getRunningServices(DevServiceOwner owner, DevServicesConfig globalConfig,
             Object identifyingConfig) {
-        ComparableDevServicesConfig key = new ComparableDevServicesConfig(owner, globalConfig, identifyingConfig);
+        ComparableDevServicesConfig key = new ComparableDevServicesConfig(owner, globalConfig, identifyingConfig, uuid);
         return tracker.getRunningServices(key);
     }
 
@@ -34,14 +36,14 @@ public final class DevServicesTrackerBuildItem extends SimpleBuildItem {
     public void addRunningService(DevServiceOwner owner, DevServicesConfig globalConfig,
             Object identifyingConfig,
             DevServicesResultBuildItem.RunnableDevService service) {
-        ComparableDevServicesConfig key = new ComparableDevServicesConfig(owner, globalConfig, identifyingConfig);
+        ComparableDevServicesConfig key = new ComparableDevServicesConfig(owner, globalConfig, identifyingConfig, uuid);
         tracker.addRunningService(key, service);
     }
 
     public void removeRunningService(DevServiceOwner owner, DevServicesConfig globalConfig,
             Object identifyingConfig,
             DevServicesResultBuildItem.RunnableDevService service) {
-        ComparableDevServicesConfig key = new ComparableDevServicesConfig(owner, globalConfig, identifyingConfig);
+        ComparableDevServicesConfig key = new ComparableDevServicesConfig(owner, globalConfig, identifyingConfig, uuid);
         tracker.removeRunningService(key, service);
     }
 

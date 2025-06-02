@@ -24,6 +24,7 @@ import io.quarkus.deployment.Feature;
 import io.quarkus.deployment.IsNormal;
 import io.quarkus.deployment.annotations.BuildStep;
 import io.quarkus.deployment.annotations.BuildSteps;
+import io.quarkus.deployment.builditem.ApplicationIdBuildItem;
 import io.quarkus.deployment.builditem.DevServicesComposeProjectBuildItem;
 import io.quarkus.deployment.builditem.DevServicesResultBuildItem;
 import io.quarkus.deployment.builditem.DevServicesResultBuildItem.RunnableDevService;
@@ -56,6 +57,7 @@ public class DevServicesRedisProcessor {
     private static final int REDIS_EXPOSED_PORT = 6379;
     private static final String REDIS_SCHEME = "redis://";
 
+    private static boolean ugh = false;
     /**
      * Label to add to shared Dev Service for Redis running in containers.
      * This allows other applications to discover the running service and use it instead of starting a new instance.
@@ -75,10 +77,15 @@ public class DevServicesRedisProcessor {
             List<DevServicesSharedNetworkBuildItem> devServicesSharedNetworkBuildItem,
             RedisBuildTimeConfig config,
             DevServicesTrackerBuildItem tracker,
+            ApplicationIdBuildItem applicationIdBuildItem,
             Optional<ConsoleInstalledBuildItem> consoleInstalledBuildItem,
             LoggingSetupBuildItem loggingSetupBuildItem,
             DevServicesConfig devServicesConfig) {
 
+        System.out.println(this.getClass().getClassLoader() + " HOLLY STARTING REDIS CONTAINERS previous " + ugh);
+        System.out.println("HOLLY launch mode " + launchMode.getLaunchMode());
+        System.out.println("HOLLY app id " + applicationIdBuildItem.getUUID());
+        System.out.println("HOLLY the container uuid " + RunningDevServicesTracker.APPLICATION_UUID);
         Map<String, DevServiceConfiguration> currentDevServicesConfiguration = new HashMap<>(config.additionalDevServices());
         currentDevServicesConfiguration.put(RedisConfig.DEFAULT_CLIENT_NAME, config.defaultDevService());
 

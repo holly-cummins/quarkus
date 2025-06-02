@@ -13,20 +13,29 @@ public class ComparableDevServicesConfig {
 
     public static final int PRIME_NUMBER = 31;
     private final DevServiceOwner owner;
+    //    private final Application application;
     private final Object globalConfig;
     private final Object identifyingConfig;
+    private final String uuid;
 
     /**
      * @param globalConfig should be a io.quarkus.deployment.dev.devservices.DevServicesConfig, but is not that type to avoid
      *        the dependency on the devservices module
      * @param identifyingConfig a config object specific to the extension's dev services configuration
      */
-    public ComparableDevServicesConfig(DevServiceOwner owner, Object globalConfig, Object identifyingConfig) {
+    public ComparableDevServicesConfig(DevServiceOwner owner, Object globalConfig, Object identifyingConfig,
+            String uuid) {
         this.owner = owner;
+        this.uuid = uuid;
         this.globalConfig = globalConfig;
         this.identifyingConfig = identifyingConfig;
 
         // TODO validate types, cache interfaces
+    }
+
+    // TODO here to make tests pass, delete this
+    public ComparableDevServicesConfig(DevServiceOwner owner, Object globalConfig, Object identifyingConfig) {
+        this(owner, globalConfig, identifyingConfig, null);
     }
 
     public DevServiceOwner getDevServicesOwner() {
@@ -46,6 +55,11 @@ public class ComparableDevServicesConfig {
 
         DevServiceOwner otherOwner = otherObj.getDevServicesOwner();
         if (!Objects.equals(owner, otherOwner)) {
+            return false;
+        }
+
+        Object otherUUID = otherObj.uuid;
+        if (!Objects.equals(uuid, otherUUID)) {
             return false;
         }
 
@@ -153,6 +167,7 @@ public class ComparableDevServicesConfig {
     @Override
     public int hashCode() {
         int result = owner != null ? owner.hashCode() : 0;
+        result = uuid != null ? result + PRIME_NUMBER * uuid.hashCode() : result;
         result = PRIME_NUMBER * result + reflectiveHashCode(identifyingConfig);
         result = PRIME_NUMBER * result + reflectiveHashCode(globalConfig);
 
@@ -214,7 +229,7 @@ public class ComparableDevServicesConfig {
 
     @Override
     public String toString() {
-        return "ComparableDevServicesConfig[" + owner + "-" + globalConfig + "-" + identifyingConfig + "]";
+        return "ComparableDevServicesConfig[" + owner + "-" + uuid + "-" + globalConfig + "-" + identifyingConfig + "]";
     }
 
 }

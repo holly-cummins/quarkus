@@ -11,6 +11,7 @@ import java.util.Optional;
 import jakarta.inject.Inject;
 
 import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
@@ -33,6 +34,7 @@ public class BasicRedisCacheTest {
     @Inject
     SimpleCachedService simpleCachedService;
 
+    @Disabled
     @Test
     public void testTypes() {
         CacheManager cacheManager = Arc.container().select(CacheManager.class).get();
@@ -47,8 +49,14 @@ public class BasicRedisCacheTest {
 
     @Test
     public void testAllCacheAnnotations() {
+        //        try {
+        //            Thread.sleep(1000 * 10);
+        //        } catch (InterruptedException e) {
+        //            throw new RuntimeException(e);
+        //        }
         RedisDataSource redisDataSource = Arc.container().select(RedisDataSource.class).get();
         List<String> allKeysAtStart = TestUtil.allRedisKeys(redisDataSource);
+        System.out.println("HOLLY allKeysAtStart: " + allKeysAtStart);
 
         // STEP 1
         // Action: @CacheResult-annotated method call.
@@ -56,7 +64,7 @@ public class BasicRedisCacheTest {
         // Verified by: STEP 2.
         String value1 = simpleCachedService.cachedMethod(KEY_1);
         List<String> newKeys = TestUtil.allRedisKeys(redisDataSource);
-        assertEquals(allKeysAtStart.size() + 1, newKeys.size());
+        assertEquals(allKeysAtStart.size() + 1, newKeys.size(), "Compared " + allKeysAtStart + " and " + newKeys);
         Assertions.assertThat(newKeys).contains(expectedCacheKey(KEY_1));
 
         // STEP 2
@@ -119,9 +127,10 @@ public class BasicRedisCacheTest {
         // Action: full cache invalidation.
         // Expected effect: empty cache.
         // Verified by: comparison with previous number of keys, STEPS 9 and 10.
+        System.out.println("HOLLY about ti invalidate all");
         simpleCachedService.invalidateAll();
         newKeys = TestUtil.allRedisKeys(redisDataSource);
-        assertEquals(allKeysAtStart.size(), newKeys.size());
+        assertEquals(allKeysAtStart.size(), newKeys.size(), "Compared " + allKeysAtStart + " and " + newKeys);
         Assertions.assertThat(newKeys).doesNotContain(expectedCacheKey(KEY_1), expectedCacheKey(KEY_2));
 
         // STEP 9

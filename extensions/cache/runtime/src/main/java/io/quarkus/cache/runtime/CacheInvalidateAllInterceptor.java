@@ -28,12 +28,15 @@ public class CacheInvalidateAllInterceptor extends CacheInterceptor {
         CacheInterceptionContext<CacheInvalidateAll> interceptionContext = getInterceptionContext(invocationContext,
                 CacheInvalidateAll.class, false);
 
+        System.out.println("HOLLY interception context: " + interceptionContext.getCacheKeyParameterPositions());
+
         if (interceptionContext.getInterceptorBindings().isEmpty()) {
             // This should never happen.
             LOGGER.warn(INTERCEPTOR_BINDINGS_ERROR_MSG);
             return invocationContext.proceed();
         }
         ReturnType returnType = determineReturnType(invocationContext.getMethod().getReturnType());
+        System.out.println("HOLLY returnType: " + returnType);
         if (returnType == ReturnType.NonAsync) {
             return invalidateAllBlocking(invocationContext, interceptionContext);
 

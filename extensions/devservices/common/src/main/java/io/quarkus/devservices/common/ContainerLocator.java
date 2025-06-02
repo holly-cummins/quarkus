@@ -79,6 +79,7 @@ public class ContainerLocator {
 
     public Optional<ContainerAddress> locateContainer(String serviceName, boolean shared, LaunchMode launchMode) {
         if (shared && launchMode == LaunchMode.DEVELOPMENT) {
+            System.out.println("HOLLY looking up using uuid " + RunningDevServicesTracker.APPLICATION_UUID);
             return lookup(serviceName)
                     .flatMap(container -> getMappedPort(container, port).stream()
                             .flatMap(containerPort -> Optional.ofNullable(containerPort.getPublicPort())
