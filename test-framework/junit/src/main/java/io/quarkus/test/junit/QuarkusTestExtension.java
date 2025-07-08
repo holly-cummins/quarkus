@@ -590,23 +590,28 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
                 && !isNested;
         if (isNewTestClass && state != null) {
             state.setTestFailed(null);
-            currentJUnitTestClass = extensionContext.getRequiredTestClass();
         }
+        currentJUnitTestClass = extensionContext.getRequiredTestClass();
+
         boolean isNewApplication = isNewApplication(state, extensionContext.getRequiredTestClass());
 
         QuarkusClassLoader cl = getClassLoaderFromTestClass(extensionContext.getRequiredTestClass());
 
-        CuratedApplication curatedApplication = runningQuarkusApplication != null
-                ? ((QuarkusClassLoader) runningQuarkusApplication.getClassLoader())
-                        .getCuratedApplication()
-                : null;
-        boolean isSameCuratedApplication = cl.getCuratedApplication() == curatedApplication;
+        // We can only reason about changes in the curated application in a sensible way the first time we see a test class
+        if (isNewTestClass) {
+            CuratedApplication testContextCuratedApplication = cl.getCuratedApplication();
+            if (testContextCuratedApplication == null) {
+                throw new IllegalStateException(
+                        "Internal error: ClassLoader " + cl + " does not have a linked curated application.");
+            }
 
-        if (cl.getCuratedApplication() == null) {
-            throw new IllegalStateException(
-                    "Internal error: ClassLoader " + cl + " does not have a linked curated application.");
+            CuratedApplication runningCuratedApplication = runningQuarkusApplication != null
+                    ? ((QuarkusClassLoader) runningQuarkusApplication.getClassLoader())
+                            .getCuratedApplication()
+                    : null;
+            boolean isSameCuratedApplication = testContextCuratedApplication == runningCuratedApplication;
+            testContextCuratedApplication.setEligibleForReuse(isSameCuratedApplication);
         }
-        cl.getCuratedApplication().setEligibleForReuse(isSameCuratedApplication);
 
         // Let's clear the class-based caches of JDK/libraries when we switch to another application
         if (!isSameCuratedApplication) {
