@@ -25,6 +25,7 @@ public final class KubernetesClientBuildItem extends SimpleBuildItem {
     }
 
     public KubernetesClient buildClient() {
+        System.out.println("HOLLY Making client with config " + config);
         return new KubernetesClientBuilder().withConfig(config).withHttpClientFactory(httpClientFactory).build();
     }
 }

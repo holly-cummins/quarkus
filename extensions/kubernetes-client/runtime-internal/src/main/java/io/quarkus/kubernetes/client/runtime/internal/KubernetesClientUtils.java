@@ -17,11 +17,16 @@ public class KubernetesClientUtils {
     private KubernetesClientUtils() {
     }
 
-    public static Config createConfig(KubernetesClientBuildConfig buildConfig) {
+    public static Config createConfig(KubernetesClientBuildConfig buildConfig, KubernetesClientConfig config) {
         boolean globalTrustAll = ConfigProvider.getConfig().getOptionalValue("quarkus.tls.trust-all", Boolean.class)
                 .orElse(false);
         Config base = Config.autoConfigure(null);
         boolean trustAll = buildConfig.trustCerts().isPresent() ? buildConfig.trustCerts().get() : globalTrustAll;
+        String masterUrl = config.apiServerUrl()
+                .or(() -> Optional
+                        .ofNullable(ConfigProvider.getConfig().getConfigValue("quarkus.kubernetes-client.api-server-url")
+                                .getValue()))
+                .or(() -> config.masterUrl()).orElse(base.getMasterUrl());
         return new ConfigBuilder()
                 .withTrustCerts(trustAll)
                 .withWatchReconnectInterval(
@@ -29,13 +34,13 @@ public class KubernetesClientUtils {
                 .withWatchReconnectLimit(buildConfig.watchReconnectLimit().orElse(base.getWatchReconnectLimit()))
                 .withConnectionTimeout(millisAsInt(buildConfig.connectionTimeout()).orElse(base.getConnectionTimeout()))
                 .withRequestTimeout(millisAsInt(buildConfig.requestTimeout()).orElse(base.getRequestTimeout()))
-                .withMasterUrl(buildConfig.apiServerUrl().or(() -> buildConfig.masterUrl()).orElse(base.getMasterUrl()))
+                .withMasterUrl(masterUrl)
                 .withNamespace(buildConfig.namespace().orElse(base.getNamespace()))
                 .withUsername(buildConfig.username().orElse(base.getUsername()))
                 .withPassword(buildConfig.password().orElse(base.getPassword()))
                 .withOauthToken(buildConfig.token().orElse(base.getOauthToken()))
-                .withCaCertFile(buildConfig.caCertFile().orElse(base.getCaCertFile()))
-                .withCaCertData(buildConfig.caCertData().orElse(base.getCaCertData()))
+                .withCaCertFile(config.caCertFile().orElse(base.getCaCertFile()))
+                .withCaCertData(config.caCertData().orElse(base.getCaCertData()))
                 .withClientCertFile(buildConfig.clientCertFile().orElse(base.getClientCertFile()))
                 .withClientCertData(buildConfig.clientCertData().orElse(base.getClientCertData()))
                 .withClientKeyFile(buildConfig.clientKeyFile().orElse(base.getClientKeyFile()))
@@ -59,13 +64,15 @@ public class KubernetesClientUtils {
         return duration.map(d -> (int) d.toMillis());
     }
 
-    public static KubernetesClient createClient(KubernetesClientBuildConfig buildConfig) {
-        return new KubernetesClientBuilder().withConfig(createConfig(buildConfig)).build();
+    public static KubernetesClient createClient(KubernetesClientBuildConfig buildConfig, KubernetesClientConfig config) {
+        System.out.println("HOLLY creating client from " + buildConfig);
+        return new KubernetesClientBuilder().withConfig(createConfig(buildConfig, config)).build();
     }
 
     public static KubernetesClient createClient() {
         org.eclipse.microprofile.config.Config config = ConfigProvider.getConfig();
         Config base = Config.autoConfigure(null);
+        System.out.println("HOLLY creating client " + "no args" + config);
         return new KubernetesClientBuilder().withConfig(new ConfigBuilder()
                 .withTrustCerts(config.getOptionalValue(PREFIX + "trust-certs", Boolean.class).orElse(base.isTrustCerts()))
                 .withWatchReconnectLimit(config.getOptionalValue(PREFIX + "watch-reconnect-limit", Integer.class)

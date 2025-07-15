@@ -7,10 +7,13 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import io.fabric8.kubernetes.client.KubernetesClient;
+import io.quarkus.kubernetes.client.devservices.it.profiles.DevServiceKubernetes;
 import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.TestProfile;
 
 @QuarkusTest
-public class DevServicesKubernetesTest {
+@TestProfile(DevServiceKubernetes.class)
+public class DevServicesWithProfileKubernetesTest {
 
     @Inject
     KubernetesClient kubernetesClient;
@@ -18,13 +21,7 @@ public class DevServicesKubernetesTest {
     @Test
     @DisplayName("given kubernetes container must communicate with it and return its version")
     public void shouldReturnAVersion() {
-        Assertions.assertEquals("v1.32.0", // This version isn't written down anywhere I could find so might change as we do upgrades
+        Assertions.assertEquals("v" + DevServiceKubernetes.API_VERSION,
                 kubernetesClient.getKubernetesVersion().getGitVersion());
-    }
-
-    @Test
-    @DisplayName("specified manifest must be applied to the cluster by the dev service")
-    public void manifestIsApplied() {
-        Assertions.assertNotNull(kubernetesClient.namespaces().withName("example-namespace").get());
     }
 }

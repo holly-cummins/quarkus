@@ -173,6 +173,7 @@ public final class DevServicesResultBuildItem extends MultiBuildItem {
     }
 
     public Map<String, String> getConfig(Startable startable) {
+        System.out.println("HOLLY WAHOO get config");
         SupplierMap<String, String> map = new SupplierMap<>();
         if (config != null && !config.isEmpty()) {
             map.putAll(config);
@@ -180,6 +181,7 @@ public final class DevServicesResultBuildItem extends MultiBuildItem {
         for (Map.Entry<String, Function<Startable, String>> entry : applicationConfigProvider.entrySet()) {
             map.put(entry.getKey(), () -> entry.getValue().apply(startable));
         }
+        System.out.println("HOLLY returning " + map.asEagerMap());
         return map;
     }
 

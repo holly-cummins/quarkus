@@ -12,7 +12,7 @@ import io.smallrye.config.ConfigMapping;
 import io.smallrye.config.WithDefault;
 
 @ConfigMapping(prefix = "quarkus.kubernetes-client")
-@ConfigRoot(phase = ConfigPhase.BUILD_AND_RUN_TIME_FIXED)
+@ConfigRoot(phase = ConfigPhase.BUILD_TIME)
 public interface KubernetesClientBuildConfig {
 
     /**
@@ -21,30 +21,9 @@ public interface KubernetesClientBuildConfig {
     Optional<Boolean> trustCerts();
 
     /**
-     * URL of the Kubernetes API server
-     */
-    Optional<String> apiServerUrl();
-
-    /**
-     * Use api-server-url instead.
-     */
-    @Deprecated(forRemoval = true)
-    Optional<String> masterUrl();
-
-    /**
      * Default namespace to use
      */
     Optional<String> namespace();
-
-    /**
-     * CA certificate file
-     */
-    Optional<String> caCertFile();
-
-    /**
-     * CA certificate data
-     */
-    Optional<String> caCertData();
 
     /**
      * Client certificate file

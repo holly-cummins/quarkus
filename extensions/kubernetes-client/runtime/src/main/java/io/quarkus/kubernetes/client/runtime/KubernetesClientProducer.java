@@ -19,6 +19,7 @@ public class KubernetesClientProducer {
     @Singleton
     @Produces
     public KubernetesClient kubernetesClient(KubernetesSerialization kubernetesSerialization, Config config) {
+        System.out.println("HOLLY producing client from " + kubernetesSerialization + " with config " + config.getMasterUrl());
         client = new KubernetesClientBuilder()
                 .withKubernetesSerialization(kubernetesSerialization).withConfig(config).build();
         return client;

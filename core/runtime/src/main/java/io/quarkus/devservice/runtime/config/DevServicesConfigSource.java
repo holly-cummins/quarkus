@@ -57,6 +57,6 @@ public class DevServicesConfigSource implements ConfigSource {
     @Override
     public int getOrdinal() {
         // See discussion on DevServicesConfigBuilder about what the right value here is
-        return 10;
+        return 300;
     }
 }

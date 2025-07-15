@@ -102,8 +102,10 @@ public class DevServicesRedisProcessor {
                                     .build());
                 }
             }
-        } catch (Throwable t) {
-            throw new RuntimeException(t);
+        } catch (RuntimeException re) {
+            throw re;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
 
     }
