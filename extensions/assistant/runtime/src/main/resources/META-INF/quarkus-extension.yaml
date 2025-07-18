@@ -2,3 +2,4 @@ name: Assistant
 description: Assistance for Quarkus
 metadata:
   hide-in-dev-ui: true
+  guide: "https://quarkus.io/guides/assistant"
