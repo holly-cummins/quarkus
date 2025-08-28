@@ -175,7 +175,7 @@ export class QwcWelcome extends LitElement {
                                 <p>This page is served by the Quarkus Dev UI (only in dev mode ) until you provide your own Web UI</p>
                                 <a href="extensions" class="cta-button">Visit the Dev UI</a>
                                 <div class="locations">
-                                    <span>Learn how you can <a href="https://quarkus.io/guides/http-reference" target="_blank">add your own static web content</a></span>
+                                    <span>Learn how you can <a href="https://quarkus.io/guides/http-reference" target="_blank">add your own web content</a></span>
                                     <span>App configuration: <code>${devuiState.welcomeData.configFile}</code></span>
                                     <span>Static assets: <code>${devuiState.welcomeData.resourcesDir}/META-INF/resources/</code></span>
                                     <span>Code: <code>${devuiState.welcomeData.sourceDir}</code></span>
