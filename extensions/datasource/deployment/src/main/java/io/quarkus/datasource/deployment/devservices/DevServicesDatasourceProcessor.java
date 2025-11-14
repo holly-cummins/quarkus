@@ -1,17 +1,16 @@
 package io.quarkus.datasource.deployment.devservices;
 
-import java.io.Closeable;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
-import org.eclipse.microprofile.config.ConfigProvider;
 import org.jboss.logging.Logger;
 
 import io.quarkus.datasource.common.runtime.DataSourceUtil;
@@ -24,7 +23,6 @@ import io.quarkus.datasource.deployment.spi.DevServicesDatasourceResultBuildItem
 import io.quarkus.datasource.runtime.DataSourceBuildTimeConfig;
 import io.quarkus.datasource.runtime.DataSourcesBuildTimeConfig;
 import io.quarkus.deployment.Capabilities;
-import io.quarkus.deployment.Capability;
 import io.quarkus.deployment.IsDevServicesSupportedByLaunchMode;
 import io.quarkus.deployment.annotations.BuildProducer;
 import io.quarkus.deployment.annotations.BuildStep;
@@ -32,7 +30,6 @@ import io.quarkus.deployment.annotations.BuildSteps;
 import io.quarkus.deployment.builditem.CuratedApplicationShutdownBuildItem;
 import io.quarkus.deployment.builditem.DevServicesComposeProjectBuildItem;
 import io.quarkus.deployment.builditem.DevServicesResultBuildItem;
-import io.quarkus.deployment.builditem.DevServicesResultBuildItem.RunningDevService;
 import io.quarkus.deployment.builditem.DevServicesSharedNetworkBuildItem;
 import io.quarkus.deployment.builditem.DockerStatusBuildItem;
 import io.quarkus.deployment.builditem.LaunchModeBuildItem;
@@ -50,12 +47,6 @@ public class DevServicesDatasourceProcessor {
 
     private static final Logger log = Logger.getLogger(DevServicesDatasourceProcessor.class);
     private static final int DOCKER_PS_ID_LENGTH = 12;
-
-    static volatile List<RunningDevService> databases;
-
-    static volatile Map<String, Object> cachedProperties;
-
-    static volatile boolean first = true;
 
     @BuildStep
     DevServicesDatasourceResultBuildItem launchDatabases(
@@ -78,42 +69,6 @@ public class DevServicesDatasourceProcessor {
         boolean useSharedNetwork = DevServicesSharedNetworkBuildItem.isSharedNetworkRequired(devServicesConfig,
                 devServicesSharedNetworkBuildItem);
 
-        //figure out if we need to shut down and restart existing databases
-        //if not and the DB's have already started we just return
-        if (databases != null) {
-            boolean restartRequired = false;
-            Map<String, Object> newDatasourceConfigs = buildMapFromBuildConfig(dataSourcesBuildTimeConfig);
-            if (!newDatasourceConfigs.equals(cachedProperties)) {
-                restartRequired = true;
-            }
-            // check here if there are any discovered devservices that are not running
-            List<String> runningContainerIds = composeProjectBuildItem.getComposeServices().values()
-                    .stream().flatMap(Collection::stream)
-                    .map(r -> r.containerInfo().id())
-                    .toList();
-            List<RunningDevService> noLongerRunningServices = databases.stream().filter(r -> !r.isOwner())
-                    .filter(r -> !runningContainerIds.contains(r.getContainerId()))
-                    .toList();
-            restartRequired = restartRequired || !noLongerRunningServices.isEmpty();
-
-            if (!restartRequired) {
-                for (RunningDevService database : databases) {
-                    devServicesResultBuildItemBuildProducer.produce(database.toBuildItem());
-                }
-                // keep the previous behaviour of producing DevServicesDatasourceResultBuildItem only when the devservices first starts.
-                return null;
-            }
-            for (Closeable i : databases) {
-                try {
-                    i.close();
-                } catch (Throwable e) {
-                    log.error("Failed to stop database", e);
-                }
-            }
-            databases = null;
-            cachedProperties = null;
-        }
-
         Map<String, DevServicesDatasourceResultBuildItem.DbResult> results = new HashMap<>();
         //now we need to figure out if we need to launch some databases
         //note that because we run in dev and test mode only we know the runtime
@@ -123,7 +78,6 @@ public class DevServicesDatasourceProcessor {
         //support for named datasources will come later
 
         Map<String, String> propertiesMap = new HashMap<>();
-        List<RunningDevService> runningDevServices = new ArrayList<>();
         Map<String, List<DevServicesDatasourceConfigurationHandlerBuildItem>> configHandlersByDbType = configurationHandlerBuildItems
                 .stream()
                 .collect(Collectors.toMap(DevServicesDatasourceConfigurationHandlerBuildItem::getDbKind,
@@ -138,44 +92,22 @@ public class DevServicesDatasourceProcessor {
                 .collect(Collectors.toMap(DevServicesDatasourceProviderBuildItem::getDatabase,
                         DevServicesDatasourceProviderBuildItem::getDevServicesProvider));
 
+        Set<DevServicesResultBuildItem> databases = new HashSet<>();
         for (Map.Entry<String, DataSourceBuildTimeConfig> entry : dataSourcesBuildTimeConfig.dataSources().entrySet()) {
-            RunningDevService devService = startDevDb(entry.getKey(), capabilities, curateOutcomeBuildItem,
+            DevServicesResultBuildItem devService = createDevDb(entry.getKey(), capabilities, curateOutcomeBuildItem,
                     installedDrivers, dataSourcesBuildTimeConfig.hasNamedDataSources(),
                     devDBProviderMap, entry.getValue(), configHandlersByDbType, propertiesMap,
                     dockerStatusBuildItem, composeProjectBuildItem,
                     launchMode.getLaunchMode(), consoleInstalledBuildItem, loggingSetupBuildItem,
                     devServicesConfig, useSharedNetwork);
             if (devService != null) {
-                runningDevServices.add(devService);
+                databases.add(devService);
                 results.put(entry.getKey(), toDbResult(devService));
             }
         }
 
-        if (first) {
-            first = false;
-            Runnable closeTask = new Runnable() {
-                @Override
-                public void run() {
-                    if (databases != null) {
-                        for (Closeable i : databases) {
-                            try {
-                                i.close();
-                            } catch (Throwable t) {
-                                log.error("Failed to stop database", t);
-                            }
-                        }
-                    }
-                    first = true;
-                    databases = null;
-                    cachedProperties = null;
-                }
-            };
-            closeBuildItem.addCloseTask(closeTask, true);
-        }
-        databases = runningDevServices;
-        cachedProperties = buildMapFromBuildConfig(dataSourcesBuildTimeConfig);
-        for (RunningDevService database : databases) {
-            devServicesResultBuildItemBuildProducer.produce(database.toBuildItem());
+        for (DevServicesResultBuildItem database : databases) {
+            devServicesResultBuildItemBuildProducer.produce(database);
         }
         return new DevServicesDatasourceResultBuildItem(results);
     }
@@ -214,7 +146,7 @@ public class DevServicesDatasourceProcessor {
         return res;
     }
 
-    private RunningDevService startDevDb(
+    private DevServicesResultBuildItem createDevDb(
             String dbName,
             Capabilities capabilities,
             CurateOutcomeBuildItem curateOutcomeBuildItem,
@@ -323,8 +255,8 @@ public class DevServicesDatasourceProcessor {
                     dataSourceBuildTimeConfig.devservices().reuse(),
                     dataSourceBuildTimeConfig.devservices().showLogs());
 
-            DevServicesDatasourceProvider.RunningDevServicesDatasource datasource = devDbProvider
-                    .startDatabase(
+            DevServicesResultBuildItem datasource = devDbProvider
+                    .createDatabase(
                             ConfigUtils.getFirstOptionalValue(DataSourceUtil.dataSourcePropertyKeys(dbName, "username"),
                                     String.class),
                             ConfigUtils.getFirstOptionalValue(DataSourceUtil.dataSourcePropertyKeys(dbName, "password"),
@@ -359,43 +291,44 @@ public class DevServicesDatasourceProcessor {
 
             Map<String, String> devDebProperties = new HashMap<>();
             for (DevServicesDatasourceConfigurationHandlerBuildItem devDbConfigurationHandlerBuildItem : configHandlers) {
-                Map<String, String> properties = devDbConfigurationHandlerBuildItem.getConfigProviderFunction().apply(dbName,
-                        datasource);
-                for (Map.Entry<String, String> entry : properties.entrySet()) {
-                    if (entry.getKey().contains(".jdbc.") && entry.getKey().endsWith(".url")) {
-                        if (capabilities.isCapabilityWithPrefixPresent(Capability.AGROAL)) {
-                            devDebProperties.put(entry.getKey(), entry.getValue());
-                        }
-                    } else {
-                        devDebProperties.put(entry.getKey(), entry.getValue());
-                    }
-                }
+                //     TODO           Map<String, String> properties = devDbConfigurationHandlerBuildItem.getConfigProviderFunction().apply(dbName,
+                //                        datasource);
+                //                for (Map.Entry<String, String> entry : properties.entrySet()) {
+                //                    if (entry.getKey().contains(".jdbc.") && entry.getKey().endsWith(".url")) {
+                //                        if (capabilities.isCapabilityWithPrefixPresent(Capability.AGROAL)) {
+                //                            devDebProperties.put(entry.getKey(), entry.getValue());
+                //                        }
+                //                    } else {
+                //                        devDebProperties.put(entry.getKey(), entry.getValue());
+                //                    }
             }
-            setDataSourceProperties(devDebProperties, dbName, "db-kind", defaultDbKind.get());
-            if (datasource.username() != null) {
-                setDataSourceProperties(devDebProperties, dbName, "username", datasource.username());
-            }
-            if (datasource.password() != null) {
-                setDataSourceProperties(devDebProperties, dbName, "password", datasource.password());
-            }
-            compressor.close();
-            if (datasource.id() == null) {
-                log.infof("Dev Services for %s (%s) started", dataSourcePrettyName, defaultDbKind.get());
-            } else {
-                log.infof("Dev Services for %s (%s) started - container ID is %s", dataSourcePrettyName, defaultDbKind.get(),
-                        datasource.id().length() > DOCKER_PS_ID_LENGTH ? datasource.id().substring(0,
-                                DOCKER_PS_ID_LENGTH) : datasource.id());
-            }
-
-            List<String> devservicesPrefixes = DataSourceUtil.dataSourcePropertyKeys(dbName, "devservices.");
-            for (var name : ConfigProvider.getConfig().getPropertyNames()) {
-                for (String prefix : devservicesPrefixes) {
-                    if (name.startsWith(prefix)) {
-                        devDebProperties.put(name, ConfigProvider.getConfig().getValue(name, String.class));
-                    }
-                }
-            }
-            return new RunningDevService(defaultDbKind.get(), datasource.id(), datasource.closeTask(), devDebProperties);
+            //            }
+            //            setDataSourceProperties(devDebProperties, dbName, "db-kind", defaultDbKind.get());
+            //            if (datasource.username() != null) {
+            //                setDataSourceProperties(devDebProperties, dbName, "username", datasource.username());
+            //            }
+            //            if (datasource.password() != null) {
+            //                setDataSourceProperties(devDebProperties, dbName, "password", datasource.password());
+            //            }
+            //            compressor.close();
+            //            if (datasource.id() == null) {
+            //                log.infof("Dev Services for %s (%s) started", dataSourcePrettyName, defaultDbKind.get());
+            //            } else {
+            //                log.infof("Dev Services for %s (%s) started - container ID is %s", dataSourcePrettyName, defaultDbKind.get(),
+            //                        datasource.id().length() > DOCKER_PS_ID_LENGTH ? datasource.id().substring(0,
+            //                                DOCKER_PS_ID_LENGTH) : datasource.id());
+            //            }
+            //
+            //            List<String> devservicesPrefixes = DataSourceUtil.dataSourcePropertyKeys(dbName, "devservices.");
+            //            for (var name : ConfigProvider.getConfig().getPropertyNames()) {
+            //                for (String prefix : devservicesPrefixes) {
+            //                    if (name.startsWith(prefix)) {
+            //                        devDebProperties.put(name, ConfigProvider.getConfig().getValue(name, String.class));
+            //                    }
+            //                }
+            //            }
+            // TODO add in all the config
+            return DevServicesResultBuildItem.owned().build();
         } catch (Throwable t) {
             compressor.closeAndDumpCaptured();
             throw new RuntimeException(t);
@@ -409,7 +342,7 @@ public class DevServicesDatasourceProcessor {
         }
     }
 
-    private DevServicesDatasourceResultBuildItem.DbResult toDbResult(RunningDevService devService) {
+    private DevServicesDatasourceResultBuildItem.DbResult toDbResult(DevServicesResultBuildItem devService) {
         if (devService == null) {
             return null;
         }

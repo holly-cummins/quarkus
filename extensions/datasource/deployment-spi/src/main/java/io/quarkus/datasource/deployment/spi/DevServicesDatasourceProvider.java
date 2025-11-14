@@ -5,6 +5,7 @@ import java.time.Duration;
 import java.util.Optional;
 
 import io.quarkus.datasource.common.runtime.DataSourceUtil;
+import io.quarkus.deployment.builditem.DevServicesResultBuildItem;
 import io.quarkus.runtime.LaunchMode;
 
 public interface DevServicesDatasourceProvider {
@@ -37,6 +38,13 @@ public interface DevServicesDatasourceProvider {
 
     default boolean isDockerRequired() {
         return true;
+    }
+
+    default DevServicesResultBuildItem createDatabase(Optional<String> username, Optional<String> password, String dbName,
+            DevServicesDatasourceContainerConfig containerConfig, LaunchMode launchMode, Optional<Duration> timeout) {
+        throw new IllegalStateException(
+                "Please implement createDatabase(Optional, Optional, String, DevServicesDatasourceContainerConfig, LaunchMode, Optional)");
+
     }
 
     record RunningDevServicesDatasource(String id, String jdbcUrl, String reactiveUrl, String username, String password,
