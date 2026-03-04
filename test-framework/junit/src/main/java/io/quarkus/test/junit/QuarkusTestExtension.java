@@ -611,11 +611,11 @@ public class QuarkusTestExtension extends AbstractJvmQuarkusTestExtension
                     : null;
             boolean isSameCuratedApplication = testContextCuratedApplication == runningCuratedApplication;
             testContextCuratedApplication.setEligibleForReuse(isSameCuratedApplication);
-        }
 
-        // Let's clear the class-based caches of JDK/libraries when we switch to another application
-        if (!isSameCuratedApplication) {
-            ClearCache.clearCaches();
+            // Let's clear the class-based caches of JDK/libraries when we switch to another application
+            if (!isSameCuratedApplication) {
+                ClearCache.clearCaches();
+            }
         }
 
         if (cl.isClosed()) {
