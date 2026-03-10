@@ -33,7 +33,7 @@
         <jandex.version>3.5.3</jandex.version>
         <jandex-gradle-plugin.version>2.3.0</jandex-gradle-plugin.version>
 
-        <asciidoctorj.version>3.0.0</asciidoctorj.version>
+        <asciidoctorj.version>3.0.1</asciidoctorj.version>
         <htmlunit.version>4.21.0</htmlunit.version>
         <javaparser-core.version>3.28.0</javaparser-core.version>
         <jdeparser.version>2.1.0</jdeparser.version>
