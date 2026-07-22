@@ -54,11 +54,11 @@ public class StartableContainer<T extends GenericContainer<?>> implements Starta
     }
 
     @Override
-    public boolean isReusable() {
-        return isContainerReusable(container);
+    public boolean isReusableBetweenProcesses() {
+        return isContainerReusableBetweenProcesses(container);
     }
 
-    public static boolean isContainerReusable(GenericContainer<?> container) {
+    public static boolean isContainerReusableBetweenProcesses(GenericContainer<?> container) {
         return TestcontainersConfiguration.getInstance().environmentSupportsReuse()
                 && container.isShouldBeReused();
     }

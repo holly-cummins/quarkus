@@ -10,7 +10,12 @@ public interface Startable extends Closeable {
     // This starts to couple to containers, so we could move it to sub-interface and use that in dev services
     String getContainerId();
 
-    default boolean isReusable() {
+    /**
+     * If this is true, a container will *never* be shut down.
+     * It typically maps to testcontainers reuse, and relies on testcontainers ryuk to shut containers down.
+     * 
+     */
+    default boolean isReusableBetweenProcesses() {
         return false;
     }
 

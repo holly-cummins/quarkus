@@ -68,7 +68,7 @@ public class CuratedApplication implements Serializable, AutoCloseable {
     final ApplicationModel appModel;
 
     final AtomicInteger runtimeClassLoaderCount = new AtomicInteger();
-    private boolean eligibleForReuse = false;
+    private boolean eligibleForReuseBetweenTests = false;
 
     CuratedApplication(QuarkusBootstrap quarkusBootstrap, CurationResult curationResult,
             ConfiguredClassLoading configuredClassLoading) {
@@ -78,8 +78,8 @@ public class CuratedApplication implements Serializable, AutoCloseable {
         this.configuredClassLoading = configuredClassLoading;
     }
 
-    public void setEligibleForReuse(boolean eligible) {
-        this.eligibleForReuse = eligible;
+    public void setEligibleForReuseBetweenTests(boolean eligible) {
+        this.eligibleForReuseBetweenTests = eligible;
     }
 
     public boolean isFlatClassPath() {
@@ -490,8 +490,8 @@ public class CuratedApplication implements Serializable, AutoCloseable {
         augmentationElements.clear();
     }
 
-    public boolean isEligibleForReuse() {
-        return eligibleForReuse;
+    public boolean isEligibleForReuseBetweenTests() {
+        return eligibleForReuseBetweenTests;
     }
 
     /**

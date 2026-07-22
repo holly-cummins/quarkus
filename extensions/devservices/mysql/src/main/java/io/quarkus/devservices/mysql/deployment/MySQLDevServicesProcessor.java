@@ -153,8 +153,8 @@ public class MySQLDevServicesProcessor {
         }
 
         @Override
-        public boolean isReusable() {
-            return StartableContainer.isContainerReusable(this);
+        public boolean isReusableBetweenProcesses() {
+            return StartableContainer.isContainerReusableBetweenProcesses(this);
         }
 
         @Override
